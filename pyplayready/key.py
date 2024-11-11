@@ -20,7 +20,7 @@ class Key:
         RSA128 = 0x0001
         ChainedLicense = 0x0002
         ECC256 = 0x0003
-        ECCforScalableLicenses = 4
+        ECCforScalableLicenses = 0x0004
         UNKNOWN = 0xffff
 
         @classmethod
