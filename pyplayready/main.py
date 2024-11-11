@@ -1,0 +1,230 @@
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+from zlib import crc32
+
+import click
+import requests
+from Crypto.Random import get_random_bytes
+
+from pyplayready import __version__
+from pyplayready.bcert import CertificateChain, Certificate
+from pyplayready.cdm import Cdm
+from pyplayready.device import Device
+from pyplayready.ecc_key import ECCKey
+from pyplayready.pssh import PSSH
+
+
+@click.group(invoke_without_command=True)
+@click.option("-v", "--version", is_flag=True, default=False, help="Print version information.")
+@click.option("-d", "--debug", is_flag=True, default=False, help="Enable DEBUG level logs.")
+def main(version: bool, debug: bool) -> None:
+    """Python PlayReady CDM implementation"""
+    logging.basicConfig(level=logging.DEBUG if debug else logging.INFO)
+    log = logging.getLogger()
+
+    current_year = datetime.now().year
+    copyright_years = f"2024-{current_year}"
+
+    log.info("pyplayready version %s Copyright (c) %s DevLARLEY", __version__, copyright_years)
+    log.info("https://github.com/ready-dl/pyplayready")
+    log.info("Run 'pyplayready --help' for help")
+    if version:
+        return
+
+
+@main.command(name="license")
+@click.argument("device_path", type=Path)
+@click.argument("pssh", type=PSSH)
+@click.argument("server", type=str)
+def license_(device_path: Path, pssh: PSSH, server: str) -> None:
+    """
+    Make a License Request to a server using a given PSSH
+    Will return a list of all keys within the returned license
+
+    Only works for standard license servers that don't use any license wrapping
+    """
+    log = logging.getLogger("license")
+
+    device = Device.load(device_path)
+    log.info(f"Loaded Device: {device.get_name()}")
+
+    cdm = Cdm.from_device(device)
+    log.info("Loaded CDM")
+
+    challenge = cdm.get_license_challenge(pssh.wrm_headers[0])
+    log.info("Created License Request (Challenge)")
+    log.debug(challenge)
+
+    license_res = requests.post(
+        url=server,
+        headers={
+            'Content-Type': 'text/xml; charset=UTF-8',
+        },
+        data=challenge
+    )
+
+    if license_res.status_code != 200:
+        log.error(f"Failed to send challenge: [{license_res.status_code}] {license_res.text}")
+        return
+
+    licence = license_res.text
+    log.info("Got License Message")
+    log.debug(licence)
+
+    cdm.parse_license(licence)
+    log.info("License Parsed Successfully")
+
+    for key in cdm.get_keys():
+        log.info(f"{key.key_id.hex}:{key.key.hex()}")
+
+
+@main.command()
+@click.argument("device", type=Path)
+@click.pass_context
+def test(ctx: click.Context, device: Path) -> None:
+    """
+    Test the CDM code by getting Content Keys for the Tears Of Steel demo on the Playready Test Server.
+    https://testweb.playready.microsoft.com/Content/Content2X
+    + DASH Manifest URL: https://test.playready.microsoft.com/media/profficialsite/tearsofsteel_4k.ism/manifest.mpd
+    + MSS Manifest URL: https://test.playready.microsoft.com/media/profficialsite/tearsofsteel_4k.ism.smoothstreaming/manifest
+
+    The device argument is a Path to a Playready Device (.prd) file which contains the device's group key and
+    group certificate.
+    """
+    pssh = PSSH(
+        "AAADfHBzc2gAAAAAmgTweZhAQoarkuZb4IhflQAAA1xcAwAAAQABAFIDPABXAFIATQBIAEUAQQBEAEUAUgAgAHgAbQBsAG4AcwA9ACIAaAB0AH"
+        "QAcAA6AC8ALwBzAGMAaABlAG0AYQBzAC4AbQBpAGMAcgBvAHMAbwBmAHQALgBjAG8AbQAvAEQAUgBNAC8AMgAwADAANwAvADAAMwAvAFAAbABh"
+        "AHkAUgBlAGEAZAB5AEgAZQBhAGQAZQByACIAIAB2AGUAcgBzAGkAbwBuAD0AIgA0AC4AMAAuADAALgAwACIAPgA8AEQAQQBUAEEAPgA8AFAAUg"
+        "BPAFQARQBDAFQASQBOAEYATwA+ADwASwBFAFkATABFAE4APgAxADYAPAAvAEsARQBZAEwARQBOAD4APABBAEwARwBJAEQAPgBBAEUAUwBDAFQA"
+        "UgA8AC8AQQBMAEcASQBEAD4APAAvAFAAUgBPAFQARQBDAFQASQBOAEYATwA+ADwASwBJAEQAPgA0AFIAcABsAGIAKwBUAGIATgBFAFMAOAB0AE"
+        "cAawBOAEYAVwBUAEUASABBAD0APQA8AC8ASwBJAEQAPgA8AEMASABFAEMASwBTAFUATQA+AEsATABqADMAUQB6AFEAUAAvAE4AQQA9ADwALwBD"
+        "AEgARQBDAEsAUwBVAE0APgA8AEwAQQBfAFUAUgBMAD4AaAB0AHQAcABzADoALwAvAHAAcgBvAGYAZgBpAGMAaQBhAGwAcwBpAHQAZQAuAGsAZQ"
+        "B5AGQAZQBsAGkAdgBlAHIAeQAuAG0AZQBkAGkAYQBzAGUAcgB2AGkAYwBlAHMALgB3AGkAbgBkAG8AdwBzAC4AbgBlAHQALwBQAGwAYQB5AFIA"
+        "ZQBhAGQAeQAvADwALwBMAEEAXwBVAFIATAA+ADwAQwBVAFMAVABPAE0AQQBUAFQAUgBJAEIAVQBUAEUAUwA+ADwASQBJAFMAXwBEAFIATQBfAF"
+        "YARQBSAFMASQBPAE4APgA4AC4AMQAuADIAMwAwADQALgAzADEAPAAvAEkASQBTAF8ARABSAE0AXwBWAEUAUgBTAEkATwBOAD4APAAvAEMAVQBT"
+        "AFQATwBNAEEAVABUAFIASQBCAFUAVABFAFMAPgA8AC8ARABBAFQAQQA+ADwALwBXAFIATQBIAEUAQQBEAEUAUgA+AA=="
+    )
+
+    license_server = "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:2000)"
+
+    ctx.invoke(
+        license_,
+        device_path=device,
+        pssh=pssh,
+        server=license_server
+    )
+
+
+@main.command()
+@click.option("-k", "--group_key", type=Path, required=True, help="Device ECC private group key")
+@click.option("-c", "--group_certificate", type=Path, required=True, help="Device group certificate chain")
+@click.option("-o", "--output", type=Path, default=None, help="Output Path or Directory")
+@click.pass_context
+def create_device(
+    ctx: click.Context,
+    group_key: Path,
+    group_certificate: Path,
+    output: Optional[Path] = None
+) -> None:
+    """Create a Playready Device (.prd) file from an ECC private group key and group certificate chain"""
+    if not group_key.is_file():
+        raise click.UsageError("group_key: Not a path to a file, or it doesn't exist.", ctx)
+    if not group_certificate.is_file():
+        raise click.UsageError("group_certificate: Not a path to a file, or it doesn't exist.", ctx)
+
+    log = logging.getLogger("create-device")
+
+    encryption_key = ECCKey.generate()
+    signing_key = ECCKey.generate()
+
+    certificate_chain = CertificateChain.load(group_certificate)
+    group_key = ECCKey.load(group_key)
+
+    new_certificate = Certificate.new_key_cert(
+        cert_id=get_random_bytes(16),
+        security_level=certificate_chain.get_security_level(),
+        client_id=get_random_bytes(16),
+        signing_key=signing_key,
+        encryption_key=encryption_key,
+        group_key=group_key,
+        parent=certificate_chain
+    )
+    certificate_chain.prepend(new_certificate)
+
+    device = Device(
+        group_certificate=certificate_chain.dumps(),
+        encryption_key=encryption_key.dumps(),
+        signing_key=signing_key.dumps()
+    )
+
+    prd_bin = device.dumps()
+
+    if output and output.suffix:
+        if output.suffix.lower() != ".prd":
+            log.warning(f"Saving PRD with the file extension '{output.suffix}' but '.prd' is recommended.")
+        out_path = output
+    else:
+        out_dir = output or Path.cwd()
+        out_path = out_dir / f"{device.get_name()}_{crc32(prd_bin).to_bytes(4, 'big').hex()}.prd"
+
+    if out_path.exists():
+        log.error(f"A file already exists at the path '{out_path}', cannot overwrite.")
+        return
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(prd_bin)
+
+    log.info("Created Playready Device (.prd) file, %s", out_path.name)
+    log.info(" + Security Level: %s", device.security_level)
+    log.info(" + Group Certificate: %s (%s bytes)", bool(device.group_certificate.dumps()), len(device.group_certificate.dumps()))
+    log.info(" + Encryption Key: %s (%s bytes)", bool(device.encryption_key.dumps()), len(device.encryption_key.dumps()))
+    log.info(" + Signing Key: %s (%s bytes)", bool(device.signing_key.dumps()), len(device.signing_key.dumps()))
+    log.info(" + Saved to: %s", out_path.absolute())
+
+
+@main.command()
+@click.argument("prd_path", type=Path)
+@click.option("-o", "--out_dir", type=Path, default=None, help="Output Directory")
+@click.pass_context
+def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = None) -> None:
+    """
+    Export a Playready Device (.prd) file to a Group Certificate, Encryption Key and Signing Key
+    If an output directory is not specified, it will be stored in the current working directory
+    """
+    if not prd_path.is_file():
+        raise click.UsageError("prd_path: Not a path to a file, or it doesn't exist.", ctx)
+
+    log = logging.getLogger("export-device")
+    log.info("Exporting Playready Device (.prd) file, %s", prd_path.stem)
+
+    if not out_dir:
+        out_dir = Path.cwd()
+
+    out_path = out_dir / prd_path.stem
+    if out_path.exists():
+        if any(out_path.iterdir()):
+            log.error("Output directory is not empty, cannot overwrite.")
+            return
+        else:
+            log.warning("Output directory already exists, but is empty.")
+    else:
+        out_path.mkdir(parents=True)
+
+    device = Device.load(prd_path)
+
+    log.info(f"L{device.security_level} {device.get_name()}")
+    log.info(f"Saving to: {out_path}")
+
+    client_id_path = out_path / "bgroupcert.dat"
+    client_id_path.write_bytes(device.group_certificate.dumps())
+    log.info("Exported Group Certificate to bgroupcert.dat")
+
+    private_key_path = out_path / "zprivencr.dat"
+    private_key_path.write_bytes(device.encryption_key.dumps())
+    log.info("Exported Encryption Key as zprivencr.dat")
+
+    private_key_path = out_path / "zprivsig.dat"
+    private_key_path.write_bytes(device.signing_key.dumps())
+    log.info("Exported Signing Key as zprivsig.dat")
