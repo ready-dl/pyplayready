@@ -29,13 +29,15 @@ class Cdm:
             certificate_chain: CertificateChain,
             encryption_key: ECCKey,
             signing_key: ECCKey,
-            client_version: str = "10.0.16384.10011"
+            client_version: str = "10.0.16384.10011",
+            la_version: int = 1
     ):
         self.security_level = security_level
         self.certificate_chain = certificate_chain
         self.encryption_key = encryption_key
         self.signing_key = signing_key
         self.client_version = client_version
+        self.la_version = la_version
 
         self.curve = Curve.get_curve("secp256r1")
         self.elgamal = ElGamal(self.curve)
@@ -92,7 +94,7 @@ class Cdm:
     ) -> str:
         return (
             '<LA xmlns="http://schemas.microsoft.com/DRM/2007/03/protocols" Id="SignedData" xml:space="preserve">'
-                '<Version>1</Version>'
+                f'<Version>{self.la_version}</Version>'
                 f'<ContentHeader>{content_header}</ContentHeader>'
                 '<CLIENTINFO>'
                     f'<CLIENTVERSION>{self.client_version}</CLIENTVERSION>'
