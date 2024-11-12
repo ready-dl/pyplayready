@@ -11,7 +11,7 @@ Run `pyplayready --help` to view available cli functions
 ## Devices
 Run the command below to create a Playready Device (.prd) from a `bgroupcert.dat` and `zgpriv.dat`:
 ```shell
-pyplayready create-device -c bgroupcert.dat -g zgpriv.dat
+pyplayready create-device -c bgroupcert.dat -k zgpriv.dat
 ```
 
 Test a playready device:
