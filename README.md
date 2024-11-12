@@ -14,7 +14,16 @@ Run the command below to create a Playready Device (.prd) from a `bgroupcert.dat
 pyplayready create-device -c bgroupcert.dat -g zgpriv.dat
 ```
 
+Test a playready device:
+```shell
+pyplayready test DEVICE.prd
+```
+
+> [!IMPORTANT]  
+> There currently isn't a proper method of extracting Group Certificates/Keys. They can be found inside older Samsung phones/Smart TVs, Windows DLLs and set-top-boxes in encrypted form.
+
 ## Usage
+An example code snippet:
 ```python
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
