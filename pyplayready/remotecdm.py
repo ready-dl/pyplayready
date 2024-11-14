@@ -11,7 +11,7 @@ from pyplayready.bcert import CertificateChain
 from pyplayready.ecc_key import ECCKey
 from pyplayready.pssh import PSSH
 
-from pyplayready.exceptions import (DeviceMismatch, )
+from pyplayready.exceptions import (DeviceMismatch, InvalidInitData)
 
 
 class RemoteCdm(Cdm):
@@ -104,7 +104,7 @@ class RemoteCdm(Cdm):
         if not pssh:
             raise InvalidInitData("A pssh must be provided.")
         if not isinstance(pssh, str):
-            raise InvalidInitData(f"Expected pssh to be a {PSSH}, not {pssh!r}")
+            raise InvalidInitData(f"Expected pssh to be a {str}, not {pssh!r}")
 
         r = self.__session.post(
             url=f"{self.host}/{self.device_name}/get_license_challenge",
