@@ -34,6 +34,7 @@ import requests
 
 device = Device.load("C:/Path/To/A/Device.prd")
 cdm = Cdm.from_device(device)
+session_id = cdm.open()
 
 pssh = PSSH(
     "AAADfHBzc2gAAAAAmgTweZhAQoarkuZb4IhflQAAA1xcAwAAAQABAFIDPABXAFIATQBIAEUAQQBEAEUAUgAgAHgAbQBsAG4AcwA9ACIAaAB0AH"
@@ -51,7 +52,7 @@ pssh = PSSH(
 
 # set to `True` if your device doesn't support scalable licenses (this projects also doesn't yet) to downgrade the WRMHEADERs to v4.0.0.0
 wrm_headers = pssh.get_wrm_headers(downgrade_to_v4=False)
-request = cdm.get_license_challenge(wrm_headers[0])
+request = cdm.get_license_challenge(session_id, wrm_headers[0])
 
 response = requests.post(
     url="https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:2000)",
@@ -61,9 +62,9 @@ response = requests.post(
     data=request,
 )
 
-cdm.parse_license(response.text)
+cdm.parse_license(session_id, response.text)
 
-for key in cdm.get_keys():
+for key in cdm.get_keys(session_id):
     print(f"{key.key_id.hex}:{key.key.hex()}")
 ```
 

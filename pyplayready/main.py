@@ -227,3 +227,26 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
     private_key_path = out_path / "zprivsig.dat"
     private_key_path.write_bytes(device.signing_key.dumps())
     log.info("Exported Signing Key as zprivsig.dat")
+
+
+@main.command("serve", short_help="Serve your local CDM and Playready Devices Remotely.")
+@click.argument("config_path", type=Path)
+@click.option("-h", "--host", type=str, default="127.0.0.1", help="Host to serve from.")
+@click.option("-p", "--port", type=int, default=8786, help="Port to serve from.")
+def serve_(config_path: Path, host: str, port: int) -> None:
+    """
+    Serve your local CDM and Playready Devices Remotely.
+
+    \b
+    [CONFIG] is a path to a serve config file.
+    See `serve.example.yml` for an example config file.
+
+    \b
+    Host as 127.0.0.1 may block remote access even if port-forwarded.
+    Instead, use 0.0.0.0 and ensure the TCP port you choose is forwarded.
+    """
+    from pyplayready import serve  # isort:skip
+    import yaml  # isort:skip
+
+    config = yaml.safe_load(config_path.read_text(encoding="utf8"))
+    serve.run(config, host, port)

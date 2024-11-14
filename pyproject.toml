@@ -37,6 +37,8 @@ construct = "^2.10.70"
 ECPy = "^1.2.5"
 click = "^8.1.7"
 xmltodict = "^0.14.2"
+PyYAML = "^6.0.1"
+aiohttp = {version = "^3.9.1", optional = true}
 
 [tool.poetry.scripts]
 pyplayready = "pyplayready.main:main"

@@ -3,4 +3,6 @@ pycryptodome
 ecpy
 construct
 click
+PyYAML
+aiohttp
 xmltodict
