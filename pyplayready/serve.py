@@ -256,6 +256,7 @@ async def get_keys(request: web.Request) -> web.Response:
             "key": key.key.hex(),
             "type": str(key.key_type),
             "cipher_type": str(key.cipher_type),
+            "key_length": str(key.key_length),
         }
         for key in keys
     ]

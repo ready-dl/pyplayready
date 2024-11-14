@@ -50,7 +50,7 @@ class RemoteCdm(Cdm):
         self.device_name = device_name
 
         # spoof certificate_chain and ecc_key just so we can construct via super call
-        super().__init__(security_level, CertificateChain(), ECCKey(), ECCKey())
+        super().__init__(security_level, CertificateChain, ECCKey, ECCKey)
 
         self.__session = requests.Session()
         self.__session.headers.update({
@@ -78,12 +78,10 @@ class RemoteCdm(Cdm):
         r = self.__session.get(
             url=f"{self.host}/{self.device_name}/open"
         ).json()
+
         if r['status'] != 200:
             raise ValueError(f"Cannot Open CDM Session, {r['message']} [{r['status']}]")
         r = r["data"]
-
-        if int(r["device"]["system_id"]) != self.system_id:
-            raise DeviceMismatch("The System ID specified does not match the one specified in the API response.")
 
         if int(r["device"]["security_level"]) != self.security_level:
             raise DeviceMismatch("The Security Level specified does not match the one specified in the API response.")
@@ -100,19 +98,19 @@ class RemoteCdm(Cdm):
     def get_license_challenge(
         self,
         session_id: bytes,
-        pssh: PSSH,
+        pssh: str,
         downgrade: str
     ) -> str:
         if not pssh:
             raise InvalidInitData("A pssh must be provided.")
-        if not isinstance(pssh, PSSH):
+        if not isinstance(pssh, str):
             raise InvalidInitData(f"Expected pssh to be a {PSSH}, not {pssh!r}")
 
         r = self.__session.post(
             url=f"{self.host}/{self.device_name}/get_license_challenge",
             json={
                 "session_id": session_id.hex(),
-                "init_data": pssh.dumps(),
+                "init_data": pssh,
                 "downgrade": downgrade,
             }
         ).json()
@@ -152,10 +150,11 @@ class RemoteCdm(Cdm):
 
         return [
             Key(
-                type_=key["type"],
-                kid=Key.kid_to_uuid(bytes.fromhex(key["key_id"])),
+                key_type=key["type"],
+                key_id=Key.kid_to_uuid(bytes.fromhex(key["key_id"])),
                 key=bytes.fromhex(key["key"]),
-                cipher_type=key["cipher_type"]
+                cipher_type=key["cipher_type"],
+                key_length=key["key_length"]
             )
             for key in r["keys"]
         ]
