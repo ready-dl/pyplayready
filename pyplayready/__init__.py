@@ -8,4 +8,4 @@ from .pssh import *
 from .xml_key import *
 from .xmrlicense import *
 
-__version__ = "0.0.2"
+__version__ = "0.1.0"

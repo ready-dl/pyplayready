@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from zlib import crc32
 
 import click
 import requests
@@ -53,7 +52,7 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
     cdm = Cdm.from_device(device)
     log.info("Loaded CDM")
 
-    challenge = cdm.get_license_challenge(pssh.wrm_headers[0])
+    challenge = cdm.get_license_challenge(pssh.get_wrm_headers(downgrade_to_v4=True)[0])
     log.info("Created License Request (Challenge)")
     log.debug(challenge)
 
@@ -167,7 +166,7 @@ def create_device(
         out_path = output
     else:
         out_dir = output or Path.cwd()
-        out_path = out_dir / f"{device.get_name()}_{crc32(prd_bin).to_bytes(4, 'big').hex()}.prd"
+        out_path = out_dir / f"{device.get_name()}.prd"
 
     if out_path.exists():
         log.error(f"A file already exists at the path '{out_path}', cannot overwrite.")

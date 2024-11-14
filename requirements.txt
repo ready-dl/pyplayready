@@ -3,3 +3,4 @@ pycryptodome
 ecpy
 construct
 click
+xmltodict

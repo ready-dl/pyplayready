@@ -30,14 +30,14 @@ class Cdm:
             encryption_key: ECCKey,
             signing_key: ECCKey,
             client_version: str = "10.0.16384.10011",
-            la_version: int = 1
+            protocol_version: int = 1
     ):
         self.security_level = security_level
         self.certificate_chain = certificate_chain
         self.encryption_key = encryption_key
         self.signing_key = signing_key
         self.client_version = client_version
-        self.la_version = la_version
+        self.protocol_version = protocol_version
 
         self.curve = Curve.get_curve("secp256r1")
         self.elgamal = ElGamal(self.curve)
@@ -61,14 +61,14 @@ class Cdm:
             signing_key=device.signing_key
         )
 
-    def get_key_data(self):
+    def get_key_data(self) -> bytes:
         point1, point2 = self.elgamal.encrypt(
             message_point=self._xml_key.get_point(self.elgamal.curve),
             public_key=self._wmrm_key
         )
         return self.elgamal.to_bytes(point1.x) + self.elgamal.to_bytes(point1.y) + self.elgamal.to_bytes(point2.x) + self.elgamal.to_bytes(point2.y)
 
-    def get_cipher_data(self):
+    def get_cipher_data(self) -> bytes:
         b64_chain = base64.b64encode(self.certificate_chain.dumps()).decode()
         body = f"<Data><CertificateChains><CertificateChain>{b64_chain}</CertificateChain></CertificateChains></Data>"
 
@@ -94,7 +94,7 @@ class Cdm:
     ) -> str:
         return (
             '<LA xmlns="http://schemas.microsoft.com/DRM/2007/03/protocols" Id="SignedData" xml:space="preserve">'
-                f'<Version>{self.la_version}</Version>'
+                f'<Version>{self.protocol_version}</Version>'
                 f'<ContentHeader>{content_header}</ContentHeader>'
                 '<CLIENTINFO>'
                     f'<CLIENTVERSION>{self.client_version}</CLIENTVERSION>'

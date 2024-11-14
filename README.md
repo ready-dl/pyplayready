@@ -24,6 +24,7 @@ pyplayready test DEVICE.prd
 
 ## Usage
 An example code snippet:
+
 ```python
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
@@ -48,7 +49,9 @@ pssh = PSSH(
     "AFQATwBNAEEAVABUAFIASQBCAFUAVABFAFMAPgA8AC8ARABBAFQAQQA+ADwALwBXAFIATQBIAEUAQQBEAEUAUgA+AA=="
 )
 
-request = cdm.get_license_challenge(pssh.wrm_headers[0])
+# set to `True` if your device doesn't support scalable licenses (this projects also doesn't yet) to downgrade the WRMHEADERs to v4.0.0.0
+wrm_headers = pssh.get_wrm_headers(downgrade_to_v4=False)
+request = cdm.get_license_challenge(wrm_headers[0])
 
 response = requests.post(
     url="https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:2000)",
