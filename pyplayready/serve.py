@@ -9,7 +9,6 @@ from aiohttp import web
 from pyplayready import __version__
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
-from pyplayready.pssh import PSSH
 
 from pyplayready.exceptions import (InvalidSession, TooManySessions)
 
@@ -134,7 +133,6 @@ async def get_license_challenge(request: web.Request) -> web.Response:
         }, status=400)
 
     # get init data
-    # init_data = PSSH(body["init_data"]).get_wrm_headers(downgrade_to_v4=downgrade)
     init_data = body["init_data"]
 
     # get challenge
