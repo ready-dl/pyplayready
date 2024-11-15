@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import base64
 import re
-from typing import Optional, Union
 
 import requests
 
 from pyplayready.cdm import Cdm
 from pyplayready.bcert import CertificateChain
+from pyplayready.device import Device
 from pyplayready.ecc_key import ECCKey
-from pyplayready.pssh import PSSH
+from pyplayready.key import Key
 
 from pyplayready.exceptions import (DeviceMismatch, InvalidInitData)
 
@@ -145,7 +144,7 @@ class RemoteCdm(Cdm):
             }
         ).json()
         if r["status"] != 200:
-            raise ValueError(f"Could not get {type_} Keys, {r['message']} [{r['status']}]")
+            raise ValueError(f"Could not get Keys, {r['message']} [{r['status']}]")
         r = r["data"]
 
         return [
