@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import math
 import time
-from typing import List
+from typing import List, Union
 from uuid import UUID
 import xml.etree.ElementTree as ET
 
@@ -32,9 +32,9 @@ class Cdm:
     def __init__(
             self,
             security_level: int,
-            certificate_chain: CertificateChain,
-            encryption_key: ECCKey,
-            signing_key: ECCKey,
+            certificate_chain: Union[CertificateChain, None],
+            encryption_key: Union[ECCKey, None],
+            signing_key: Union[ECCKey, None],
             client_version: str = "10.0.16384.10011",
             protocol_version: int = 1
     ):

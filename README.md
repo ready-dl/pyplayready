@@ -66,6 +66,8 @@ cdm.parse_license(session_id, response.text)
 
 for key in cdm.get_keys(session_id):
     print(f"{key.key_id.hex}:{key.key.hex()}")
+
+cdm.close(session_id)
 ```
 
 ## Disclaimer

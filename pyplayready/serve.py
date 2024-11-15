@@ -115,7 +115,7 @@ async def get_license_challenge(request: web.Request) -> web.Response:
     device_name = request.match_info["device"]
 
     body = await request.json()
-    for required_field in ("session_id", "init_data", "downgrade"):
+    for required_field in ("session_id", "init_data"):
         if not body.get(required_field):
             return web.json_response({
                 "status": 400,
@@ -124,11 +124,6 @@ async def get_license_challenge(request: web.Request) -> web.Response:
 
     # get session id
     session_id = bytes.fromhex(body["session_id"])
-
-    # get downgrade
-    downgrade = False
-    if body['downgrade'] == 'true':
-        downgrade = True
 
     # get cdm
     cdm: Optional[Cdm] = request.app["cdms"].get((secret_key, device_name))
@@ -139,13 +134,14 @@ async def get_license_challenge(request: web.Request) -> web.Response:
         }, status=400)
 
     # get init data
-    init_data = PSSH(body["init_data"]).get_wrm_headers(downgrade_to_v4=downgrade)
+    # init_data = PSSH(body["init_data"]).get_wrm_headers(downgrade_to_v4=downgrade)
+    init_data = body["init_data"]
 
     # get challenge
     try:
         license_request = cdm.get_license_challenge(
             session_id=session_id,
-            content_header=init_data[0],
+            content_header=init_data,
         )
     except InvalidSession:
         return web.json_response({

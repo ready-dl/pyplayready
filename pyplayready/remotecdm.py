@@ -5,9 +5,7 @@ import re
 import requests
 
 from pyplayready.cdm import Cdm
-from pyplayready.bcert import CertificateChain
 from pyplayready.device import Device
-from pyplayready.ecc_key import ECCKey
 from pyplayready.key import Key
 
 from pyplayready.exceptions import (DeviceMismatch, InvalidInitData)
@@ -49,7 +47,7 @@ class RemoteCdm(Cdm):
         self.device_name = device_name
 
         # spoof certificate_chain and ecc_key just so we can construct via super call
-        super().__init__(security_level, CertificateChain, ECCKey, ECCKey)
+        super().__init__(security_level, None, None, None)
 
         self.__session = requests.Session()
         self.__session.headers.update({
@@ -97,20 +95,18 @@ class RemoteCdm(Cdm):
     def get_license_challenge(
         self,
         session_id: bytes,
-        pssh: str,
-        downgrade: str
+        wrm_header: str,
     ) -> str:
-        if not pssh:
-            raise InvalidInitData("A pssh must be provided.")
-        if not isinstance(pssh, str):
-            raise InvalidInitData(f"Expected pssh to be a {str}, not {pssh!r}")
+        if not wrm_header:
+            raise InvalidInitData("A wrm_header must be provided.")
+        if not isinstance(wrm_header, str):
+            raise InvalidInitData(f"Expected wrm_header to be a {str}, not {wrm_header!r}")
 
         r = self.__session.post(
             url=f"{self.host}/{self.device_name}/get_license_challenge",
             json={
                 "session_id": session_id.hex(),
-                "init_data": pssh,
-                "downgrade": downgrade,
+                "init_data": wrm_header,
             }
         ).json()
         if r["status"] != 200:

@@ -52,6 +52,9 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
     cdm = Cdm.from_device(device)
     log.info("Loaded CDM")
 
+    session_id = cdm.open()
+    log.info("Opened Session")
+
     challenge = cdm.get_license_challenge(pssh.get_wrm_headers(downgrade_to_v4=True)[0])
     log.info("Created License Request (Challenge)")
     log.debug(challenge)
@@ -77,6 +80,9 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
 
     for key in cdm.get_keys():
         log.info(f"{key.key_id.hex}:{key.key.hex()}")
+
+    cdm.close(session_id)
+    log.info("Clossed Session")
 
 
 @main.command()
@@ -232,7 +238,7 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
 @main.command("serve", short_help="Serve your local CDM and Playready Devices Remotely.")
 @click.argument("config_path", type=Path)
 @click.option("-h", "--host", type=str, default="127.0.0.1", help="Host to serve from.")
-@click.option("-p", "--port", type=int, default=8786, help="Port to serve from.")
+@click.option("-p", "--port", type=int, default=7723, help="Port to serve from.")
 def serve_(config_path: Path, host: str, port: int) -> None:
     """
     Serve your local CDM and Playready Devices Remotely.
