@@ -1,5 +1,7 @@
+import base64
 from enum import Enum
 from uuid import UUID
+from typing import Optional, Union
 
 
 class Key:
@@ -40,3 +42,23 @@ class Key:
         self.cipher_type = self.CipherType(cipher_type)
         self.key_length = key_length
         self.key = key
+
+    @staticmethod
+    def kid_to_uuid(kid: Union[str, bytes]) -> UUID:
+        """
+        Convert a Key ID from a string or bytes to a UUID object.
+        At first this may seem very simple but some types of Key IDs
+        may not be 16 bytes and some may be decimal vs. hex.
+        """
+        if isinstance(kid, str):
+            kid = base64.b64decode(kid)
+        if not kid:
+            kid = b"\x00" * 16
+
+        if kid.decode(errors="replace").isdigit():
+            return UUID(int=int(kid.decode()))
+
+        if len(kid) < 16:
+            kid += b"\x00" * (16 - len(kid))
+
+        return UUID(bytes=kid)

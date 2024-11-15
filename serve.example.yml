@@ -1,0 +1,15 @@
+# This data serves as an example configuration file for the `serve` command.
+# None of the sensitive data should be re-used.
+
+# List of Playready Device (.prd) file paths to use with serve.
+# Note: Each individual user needs explicit permission to use a device listed.
+devices:
+  - 'C:\Users\ready-dl\Documents\PRDs\test_device_001.prd'
+
+# List of User's by Secret Key. The Secret Key must be supplied by the User to use the API.
+users:
+  fx206W0FaB2O34HzGsgb8rcDe9e3ijsf:  # secret key, a-zA-Z-09{32} is recommended, case-sensitive
+    username: chloe  # only for internal logging, user will not see this name
+    devices:  # list of allowed devices by filename
+      - test_key_001
+  # ...
