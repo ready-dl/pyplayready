@@ -21,7 +21,7 @@ from pyplayready.xml_key import XmlKey
 from pyplayready.elgamal import ElGamal
 from pyplayready.xmrlicense import XMRLicense
 
-from pyplayready.exceptions import (InvalidSession, TooManySessions)
+from pyplayready.exceptions import (InvalidSession, TooManySessions, InvalidLicense)
 from pyplayready.session import Session
 
 
@@ -78,7 +78,7 @@ class Cdm:
 
         session = Session(len(self.__sessions) + 1)
         self.__sessions[session.id] = session
-        session._xml_key = XmlKey()
+        session.xml_key = XmlKey()
 
         return session.id
 
@@ -97,21 +97,21 @@ class Cdm:
             raise InvalidSession(f"Session identifier {session_id!r} is invalid.")
         del self.__sessions[session_id]
 
-    def get_key_data(self, session: Session) -> bytes:
+    def _get_key_data(self, session: Session) -> bytes:
         point1, point2 = self.elgamal.encrypt(
-            message_point= session._xml_key.get_point(self.elgamal.curve),
+            message_point=session.xml_key.get_point(self.elgamal.curve),
             public_key=self._wmrm_key
         )
         return self.elgamal.to_bytes(point1.x) + self.elgamal.to_bytes(point1.y) + self.elgamal.to_bytes(point2.x) + self.elgamal.to_bytes(point2.y)
 
-    def get_cipher_data(self, session: Session) -> bytes:
+    def _get_cipher_data(self, session: Session) -> bytes:
         b64_chain = base64.b64encode(self.certificate_chain.dumps()).decode()
         body = f"<Data><CertificateChains><CertificateChain>{b64_chain}</CertificateChain></CertificateChains></Data>"
 
         cipher = AES.new(
-            key=session._xml_key.aes_key,
+            key=session.xml_key.aes_key,
             mode=AES.MODE_CBC,
-            iv=session._xml_key.aes_iv
+            iv=session.xml_key.aes_iv
         )
 
         ciphertext = cipher.encrypt(pad(
@@ -119,7 +119,7 @@ class Cdm:
             AES.block_size
         ))
 
-        return session._xml_key.aes_iv + ciphertext
+        return session.xml_key.aes_iv + ciphertext
 
     def _build_digest_content(
             self,
@@ -181,8 +181,8 @@ class Cdm:
         la_content = self._build_digest_content(
             content_header=content_header,
             nonce=base64.b64encode(get_random_bytes(16)).decode(),
-            wmrm_cipher=base64.b64encode(self.get_key_data(session)).decode(),
-            cert_cipher=base64.b64encode(self.get_cipher_data(session)).decode()
+            wmrm_cipher=base64.b64encode(self._get_key_data(session)).decode(),
+            cert_cipher=base64.b64encode(self._get_cipher_data(session)).decode()
         )
 
         la_hash_obj = SHA256.new()
@@ -239,6 +239,14 @@ class Cdm:
         decrypted = self.elgamal.decrypt((point1, point2), int(session.encryption_key.key.d))
         return self.elgamal.to_bytes(decrypted.x)[16:32]
 
+    @staticmethod
+    def _verify_ecc_key(session: Session, licence: XMRLicense) -> bool:
+        ecc_keys = list(licence.get_object(42))
+        if not ecc_keys:
+            raise InvalidLicense("No ECC public key in license")
+
+        return ecc_keys[0].key == session.encryption_key.public_bytes()
+
     def parse_license(self, session_id: bytes, licence: str) -> None:
         session = self.__sessions.get(session_id)
         if not session:
@@ -249,6 +257,10 @@ class Cdm:
             license_elements = root.findall(".//{http://schemas.microsoft.com/DRM/2007/03/protocols}License")
             for license_element in license_elements:
                 parsed_licence = XMRLicense.loads(license_element.text)
+
+                if not self._verify_ecc_key(session, parsed_licence):
+                    raise InvalidLicense("Public encryption key does not match")
+
                 for key in parsed_licence.get_content_keys():
                     if Key.CipherType(key.cipher_type) == Key.CipherType.ECC256:
                         session.keys.append(Key(

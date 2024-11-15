@@ -26,7 +26,7 @@ def main(version: bool, debug: bool) -> None:
     current_year = datetime.now().year
     copyright_years = f"2024-{current_year}"
 
-    log.info("pyplayready version %s Copyright (c) %s DevLARLEY", __version__, copyright_years)
+    log.info("pyplayready version %s Copyright (c) %s DevLARLEY, Erevoc", __version__, copyright_years)
     log.info("https://github.com/ready-dl/pyplayready")
     log.info("Run 'pyplayready --help' for help")
     if version:
@@ -147,7 +147,7 @@ def create_device(
     certificate_chain = CertificateChain.load(group_certificate)
     group_key = ECCKey.load(group_key)
 
-    new_certificate = Certificate.new_key_cert(
+    new_certificate = Certificate.new_leaf_cert(
         cert_id=get_random_bytes(16),
         security_level=certificate_chain.get_security_level(),
         client_id=get_random_bytes(16),

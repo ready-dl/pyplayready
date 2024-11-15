@@ -189,7 +189,7 @@ class Certificate(_BCertStructs):
         self._BCERT = bcert_obj
 
     @classmethod
-    def new_key_cert(
+    def new_leaf_cert(
             cls,
             cert_id: bytes,
             security_level: int,

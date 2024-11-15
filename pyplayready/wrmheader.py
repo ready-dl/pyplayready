@@ -147,15 +147,14 @@ class WRMHeader:
         if not data:
             raise ValueError("Not a valid PlayReady Header Record, WRMHEADER/DATA required")
 
-        match self.version:
-            case self.Version.VERSION_4_0_0_0:
-                return self._read_v4_0_0_0(data)
-            case self.Version.VERSION_4_1_0_0:
-                return self._read_v4_1_0_0(data)
-            case self.Version.VERSION_4_2_0_0:
-                return self._read_v4_2_0_0(data)
-            case self.Version.VERSION_4_3_0_0:
-                return self._read_v4_3_0_0(data)
+        if self.version == self.Version.VERSION_4_0_0_0:
+            return self._read_v4_0_0_0(data)
+        elif self.version == self.Version.VERSION_4_1_0_0:
+            return self._read_v4_1_0_0(data)
+        elif self.version == self.Version.VERSION_4_2_0_0:
+            return self._read_v4_2_0_0(data)
+        elif self.version == self.Version.VERSION_4_3_0_0:
+            return self._read_v4_3_0_0(data)
 
     @staticmethod
     def _build_v4_0_0_0_wrm_header(

@@ -11,7 +11,7 @@ class Session:
     def __init__(self, number: int):
         self.number = number
         self.id = get_random_bytes(16)
-        self._xml_key = XmlKey()
+        self.xml_key = XmlKey()
         self.signing_key: ECCKey = None
         self.encryption_key: ECCKey = None
         self.keys: list[Key] = []

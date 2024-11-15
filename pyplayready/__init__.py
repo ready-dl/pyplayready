@@ -10,4 +10,4 @@ from .session import *
 from .xml_key import *
 from .xmrlicense import *
 
-__version__ = "0.1.0"
+__version__ = "0.3.1"
