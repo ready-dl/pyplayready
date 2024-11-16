@@ -237,9 +237,10 @@ class Certificate(_BCertStructs):
         )
 
         feature = Container(
-            feature_count=2,
+            feature_count=3,
             features=ListContainer([
                 4,  # SECURE_CLOCK
+                9,  # REVOCATION_LIST_FEATURE
                 13  # SUPPORTS_PR3_FEATURES
             ])
         )
