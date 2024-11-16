@@ -26,7 +26,7 @@ def main(version: bool, debug: bool) -> None:
     current_year = datetime.now().year
     copyright_years = f"2024-{current_year}"
 
-    log.info("pyplayready version %s Copyright (c) %s DevLARLEY, Erevoc", __version__, copyright_years)
+    log.info("pyplayready version %s Copyright (c) %s DevLARLEY, Erevoc, DevataDev", __version__, copyright_years)
     log.info("https://github.com/ready-dl/pyplayready")
     log.info("Run 'pyplayready --help' for help")
     if version:
