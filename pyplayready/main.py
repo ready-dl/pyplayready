@@ -55,7 +55,7 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
     session_id = cdm.open()
     log.info("Opened Session")
 
-    challenge = cdm.get_license_challenge(pssh.get_wrm_headers(downgrade_to_v4=True)[0])
+    challenge = cdm.get_license_challenge(session_id, pssh.get_wrm_headers(downgrade_to_v4=True)[0])
     log.info("Created License Request (Challenge)")
     log.debug(challenge)
 
@@ -75,10 +75,10 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
     log.info("Got License Message")
     log.debug(licence)
 
-    cdm.parse_license(licence)
+    cdm.parse_license(session_id, licence)
     log.info("License Parsed Successfully")
 
-    for key in cdm.get_keys():
+    for key in cdm.get_keys(session_id):
         log.info(f"{key.key_id.hex}:{key.key.hex()}")
 
     cdm.close(session_id)
