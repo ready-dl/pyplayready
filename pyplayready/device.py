@@ -102,4 +102,4 @@ class Device:
 
     def get_name(self):
         name = f"{self.group_certificate.get_name()}_sl{self.group_certificate.get_security_level()}"
-        return ''.join(char for char in name if char.isascii()).strip().lower().replace(" ", "_")
+        return ''.join(char for char in name if (char.isalpha() or char in ['_', '-', ' '])).strip().lower().replace(" ", "_")
