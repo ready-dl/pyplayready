@@ -1,7 +1,7 @@
 import base64
 from enum import Enum
 from uuid import UUID
-from typing import Optional, Union
+from typing import Union
 
 
 class Key:

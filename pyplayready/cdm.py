@@ -270,6 +270,8 @@ class Cdm:
                             key_length=key.key_length,
                             key=self._decrypt_ecc256_key(session, key.encrypted_key)
                         ))
+        except InvalidLicense as e:
+            raise InvalidLicense(e)
         except Exception as e:
             raise Exception(f"Unable to parse license, {e}")
 
