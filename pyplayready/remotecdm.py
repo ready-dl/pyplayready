@@ -64,7 +64,7 @@ class RemoteCdm(Cdm):
         if not server_version_re:
             raise ValueError("The pyplayready server API is not stating the version correctly, cannot continue.")
         server_version = server_version_re.group(1)
-        if server_version < "0.0.2":
+        if server_version < "0.3.1":
             raise ValueError(f"This pyplayready serve API version ({server_version}) is not supported.")
 
     @classmethod

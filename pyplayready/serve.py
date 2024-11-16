@@ -9,7 +9,7 @@ from pyplayready import __version__
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
 
-from pyplayready.exceptions import (InvalidSession, TooManySessions)
+from pyplayready.exceptions import (InvalidSession, TooManySessions, InvalidLicense)
 
 routes = web.RouteTableDef()
 
@@ -192,6 +192,11 @@ async def parse_license(request: web.Request) -> web.Response:
             "status": 400,
             "message": f"Invalid Session ID '{session_id.hex()}', it may have expired."
         }, status=400)
+    except InvalidLicense as e:
+        return web.json_response({
+            "status": 400,
+            "message": f"Invalid License, {e}"
+        }, status=400)
     except Exception as e:
         return web.json_response({
             "status": 400,
@@ -247,9 +252,9 @@ async def get_keys(request: web.Request) -> web.Response:
         {
             "key_id": key.key_id.hex,
             "key": key.key.hex(),
-            "type": str(key.key_type),
-            "cipher_type": str(key.cipher_type),
-            "key_length": str(key.key_length),
+            "type": key.key_type.value,
+            "cipher_type": key.cipher_type.value,
+            "key_length": key.key_length,
         }
         for key in keys
     ]
