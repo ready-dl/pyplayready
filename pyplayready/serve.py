@@ -138,7 +138,7 @@ async def get_license_challenge(request: web.Request) -> web.Response:
     try:
         license_request = cdm.get_license_challenge(
             session_id=session_id,
-            content_header=init_data,
+            wrm_header=init_data,
         )
     except InvalidSession:
         return web.json_response({

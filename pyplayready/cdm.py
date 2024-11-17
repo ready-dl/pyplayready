@@ -123,7 +123,7 @@ class Cdm:
 
     def _build_digest_content(
             self,
-            content_header: str,
+            wrm_header: str,
             nonce: str,
             wmrm_cipher: str,
             cert_cipher: str
@@ -131,7 +131,7 @@ class Cdm:
         return (
             '<LA xmlns="http://schemas.microsoft.com/DRM/2007/03/protocols" Id="SignedData" xml:space="preserve">'
                 f'<Version>{self.protocol_version}</Version>'
-                f'<ContentHeader>{content_header}</ContentHeader>'
+                f'<ContentHeader>{wrm_header}</ContentHeader>'
                 '<CLIENTINFO>'
                     f'<CLIENTVERSION>{self.client_version}</CLIENTVERSION>'
                 '</CLIENTINFO>'
@@ -170,7 +170,7 @@ class Cdm:
             '</SignedInfo>'
         )
 
-    def get_license_challenge(self, session_id: bytes, content_header: str) -> str:
+    def get_license_challenge(self, session_id: bytes, wrm_header: str) -> str:
         session = self.__sessions.get(session_id)
         if not session:
             raise InvalidSession(f"Session identifier {session_id!r} is invalid.")
@@ -179,7 +179,7 @@ class Cdm:
         session.encryption_key = self.encryption_key
 
         la_content = self._build_digest_content(
-            content_header=content_header,
+            wrm_header=wrm_header,
             nonce=base64.b64encode(get_random_bytes(16)).decode(),
             wmrm_cipher=base64.b64encode(self._get_key_data(session)).decode(),
             cert_cipher=base64.b64encode(self._get_cipher_data(session)).decode()
