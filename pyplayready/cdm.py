@@ -252,6 +252,9 @@ class Cdm:
         if not session:
             raise InvalidSession(f"Session identifier {session_id!r} is invalid.")
 
+        if not session.encryption_key or not session.signing_key:
+            raise InvalidSession("Cannot parse a license message without first making a license request")
+
         try:
             root = ET.fromstring(licence)
             license_elements = root.findall(".//{http://schemas.microsoft.com/DRM/2007/03/protocols}License")

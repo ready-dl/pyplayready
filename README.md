@@ -22,6 +22,11 @@ pyplayready test DEVICE.prd
 > [!IMPORTANT]  
 > There currently isn't a proper method of extracting Group Certificates/Keys. They can be found inside older Samsung phones/Smart TVs, Windows DLLs and set-top-boxes in encrypted form.
 
+Export a provisioned device to its raw .dat files
+```shell
+pyplayready export-device DEVICE.prd
+```
+
 ## Usage
 An example code snippet:
 
