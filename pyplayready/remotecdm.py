@@ -113,7 +113,7 @@ class RemoteCdm(Cdm):
             raise ValueError(f"Cannot get Challenge, {r['message']} [{r['status']}]")
         r = r["data"]
 
-        return r["challenge_b64"]
+        return r["challenge"]
 
     def parse_license(self, session_id: bytes, license_message: str) -> None:
         if not license_message:

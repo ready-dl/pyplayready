@@ -155,7 +155,7 @@ async def get_license_challenge(request: web.Request) -> web.Response:
         "status": 200,
         "message": "Success",
         "data": {
-            "challenge_b64": base64.b64encode(license_request.encode()).decode()
+            "challenge": license_request
         }
     }, status=200)
 
