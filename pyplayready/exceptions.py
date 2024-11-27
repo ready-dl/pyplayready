@@ -10,6 +10,10 @@ class InvalidSession(PyPlayreadyException):
     """No Session is open with the specified identifier."""
 
 
+class InvalidPssh(PyPlayreadyException):
+    """The Playready PSSH is invalid or empty."""
+
+
 class InvalidInitData(PyPlayreadyException):
     """The Playready Cenc Header Data is invalid or empty."""
 

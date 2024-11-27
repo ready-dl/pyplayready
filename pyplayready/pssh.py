@@ -1,9 +1,10 @@
 import base64
-from typing import Union
+from typing import Union, List
 from uuid import UUID
 
-from construct import Struct, Int32ul, Int16ul, Array, this, Bytes, Switch, Int32ub, Const, Container
+from construct import Struct, Int32ul, Int16ul, Array, this, Bytes, Switch, Int32ub, Const, Container, ConstructError
 
+from pyplayready.exceptions import InvalidPssh
 from pyplayready.wrmheader import WRMHeader
 
 
@@ -23,7 +24,7 @@ class _PlayreadyPSSHStructs:
         "data" / Switch(
             this.type,
             {
-                1: Bytes(this.length * 2)
+                1: Bytes(this.length)
             },
             default=Bytes(this.length)
         )
@@ -36,64 +37,54 @@ class _PlayreadyPSSHStructs:
     )
 
 
-class PSSH:
+class PSSH(_PlayreadyPSSHStructs):
     SYSTEM_ID = UUID(hex="9a04f07998404286ab92e65be0885f95")
 
-    def __init__(
-            self,
-            data: Union[str, bytes]
-    ):
+    def __init__(self, data: Union[str, bytes]):
         """Represents a PlayReady PSSH"""
         if not data:
-            raise ValueError("Data must not be empty")
+            raise InvalidPssh("Data must not be empty")
 
         if isinstance(data, str):
             try:
                 data = base64.b64decode(data)
             except Exception as e:
-                raise Exception(f"Could not decode data as Base64, {e}")
+                raise InvalidPssh(f"Could not decode data as Base64, {e}")
 
+        self.wrm_headers: List[WRMHeader]
         try:
-            if self._is_playready_pssh_box(data):
-                pssh_box = _PlayreadyPSSHStructs.PSSHBox.parse(data)
-                if bool(self._is_utf_16(pssh_box.data)):
-                    self._wrm_headers = [pssh_box.data.decode("utf-16-le")]
-                elif bool(self._is_utf_16(pssh_box.data[6:])):
-                    self._wrm_headers = [pssh_box.data[6:].decode("utf-16-le")]
-                elif bool(self._is_utf_16(pssh_box.data[10:])):
-                    self._wrm_headers = [pssh_box.data[10:].decode("utf-16-le")]
-                else:
-                    self._wrm_headers = list(self._read_wrm_headers(_PlayreadyPSSHStructs.PlayreadyHeader.parse(pssh_box.data)))
-            elif bool(self._is_utf_16(data)):
-                self._wrm_headers = [data.decode("utf-16-le")]
-            elif bool(self._is_utf_16(data[6:])):
-                self._wrm_headers = [data[6:].decode("utf-16-le")]
-            elif bool(self._is_utf_16(data[10:])):
-                self._wrm_headers = [data[10:].decode("utf-16-le")]
+            # PSSH Box -> PlayReady Header
+            box = self.PSSHBox.parse(data)
+            prh = self.PlayreadyHeader.parse(box.data)
+            self.wrm_headers = self._read_playready_objects(prh)
+        except ConstructError:
+            if int.from_bytes(data[:2], byteorder="little") > 3:
+                try:
+                    # PlayReady Header
+                    prh = self.PlayreadyHeader.parse(data)
+                    self.wrm_headers = self._read_playready_objects(prh)
+                except ConstructError:
+                    raise InvalidPssh("Could not parse data as a PSSH Box nor a PlayReady Header")
             else:
-                self._wrm_headers = list(self._read_wrm_headers(_PlayreadyPSSHStructs.PlayreadyHeader.parse(data)))
-        except Exception:
-            raise Exception("Could not parse data as a PSSH Box nor a PlayReadyHeader")
+                try:
+                    # PlayReady Object
+                    pro = self.PlayreadyObject.parse(data)
+                    self.wrm_headers = [WRMHeader(pro.data)]
+                except ConstructError:
+                    raise InvalidPssh("Could not parse data as a PSSH Box nor a PlayReady Object")
 
     @staticmethod
-    def _downgrade(wrm_header: str) -> str:
-        return WRMHeader(wrm_header).to_v4_0_0_0()
+    def _read_playready_objects(header: Container) -> List[WRMHeader]:
+        return list(map(
+            lambda pro: WRMHeader(pro.data),
+            filter(
+                lambda pro: pro.type == 1,
+                header.records
+            )
+        ))
 
     def get_wrm_headers(self, downgrade_to_v4: bool = False):
         return list(map(
-            self._downgrade if downgrade_to_v4 else (lambda _: _),
-            self._wrm_headers
+            lambda wrm_header: wrm_header.to_v4_0_0_0() if downgrade_to_v4 else wrm_header.dumps(),
+            self.wrm_headers
         ))
-
-    def _is_playready_pssh_box(self, data: bytes) -> bool:
-        return data[12:28] == self.SYSTEM_ID.bytes
-
-    @staticmethod
-    def _is_utf_16(data: bytes) -> bool:
-        return all(map(lambda i: data[i] == 0, range(1, len(data), 2)))
-
-    @staticmethod
-    def _read_wrm_headers(wrm_header: Container):
-        for record in wrm_header.records:
-            if record.type == 1:
-                yield record.data.decode("utf-16-le")

@@ -4,8 +4,7 @@ import base64
 from pathlib import Path
 from typing import Union
 
-from construct import Const, GreedyRange, Struct, Int32ub, Bytes, Int16ub, this, Switch, LazyBound, Array, Container, \
-    If, Byte
+from construct import Const, GreedyRange, Struct, Int32ub, Bytes, Int16ub, this, Switch, LazyBound, Array, Container
 
 
 class _XMRLicenseStructs:

@@ -17,6 +17,9 @@ class WRMHeader:
             self.value = value
             self.checksum = checksum
 
+        def __repr__(self):
+            return f'SignedKeyID(alg_id={self.alg_id}, value="{self.value}", checksum="{self.checksum}")'
+
     class Version(Enum):
         VERSION_4_0_0_0 = "4.0.0.0"
         VERSION_4_1_0_0 = "4.1.0.0"
@@ -184,4 +187,4 @@ class WRMHeader:
         )
 
     def dumps(self) -> str:
-        return self._raw_data.decode()
+        return self._raw_data.decode("utf-16-le")
