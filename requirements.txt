@@ -1,7 +1,7 @@
 requests
 pycryptodome
 ecpy
-construct
+construct==2.8.8
 click
 PyYAML
 aiohttp

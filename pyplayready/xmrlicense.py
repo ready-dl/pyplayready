@@ -4,7 +4,8 @@ import base64
 from pathlib import Path
 from typing import Union
 
-from construct import Const, GreedyRange, Struct, Int32ub, Bytes, Int16ub, this, Switch, LazyBound, Array, Container
+from construct import Const, GreedyRange, Struct, Int32ub, Bytes, Int16ub, this, Switch, LazyBound, Array, Container, \
+    If, Byte
 
 
 class _XMRLicenseStructs:
@@ -151,12 +152,12 @@ class _XMRLicenseStructs:
         "minimum_move_protection_level" / Int32ub
     )
 
-    XMRObject = Struct(
+    XmrObject = Struct(
         "flags" / Int16ub,
         "type" / Int16ub,
         "length" / Int32ub,
         "data" / Switch(
-            lambda this_: this_.type,
+            lambda ctx: ctx.type,
             {
                 0x0005: OutputProtectionLevelRestrictionObject,
                 0x0008: AnalogVideoOutputConfigurationRestriction,
@@ -187,7 +188,7 @@ class _XMRLicenseStructs:
                 0x005a: SecureStopRestrictionObject,
                 0x0059: DigitalVideoOutputRestrictionObject
             },
-            default=LazyBound(lambda: _XMRLicenseStructs.XMRObject)
+            default=LazyBound(lambda ctx: _XMRLicenseStructs.XmrObject)
         )
     )
 
@@ -195,7 +196,7 @@ class _XMRLicenseStructs:
         "signature" / Const(b"XMR\x00"),
         "xmr_version" / Int32ub,
         "rights_id" / Bytes(16),
-        "containers" / GreedyRange(XMRObject)
+        "containers" / GreedyRange(XmrObject)
     )
 
 

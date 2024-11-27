@@ -2,7 +2,7 @@ import base64
 from typing import Union
 from uuid import UUID
 
-from construct import Struct, Int32ul, Int16ul, Array, this, Bytes, PaddedString, Switch, Int32ub, Const, Container
+from construct import Struct, Int32ul, Int16ul, Array, this, Bytes, Switch, Int32ub, Const, Container
 
 from pyplayready.wrmheader import WRMHeader
 
@@ -23,7 +23,7 @@ class _PlayreadyPSSHStructs:
         "data" / Switch(
             this.type,
             {
-                1: PaddedString(this.length, "utf16")
+                1: Bytes(this.length * 2)
             },
             default=Bytes(this.length)
         )
@@ -96,4 +96,4 @@ class PSSH:
     def _read_wrm_headers(wrm_header: Container):
         for record in wrm_header.records:
             if record.type == 1:
-                yield record.data
+                yield record.data.decode("utf-16-le")

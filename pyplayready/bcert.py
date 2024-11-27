@@ -1,4 +1,9 @@
 from __future__ import annotations
+import collections.abc
+
+# monkey patch for construct 2.8.8 compatibility
+if not hasattr(collections, 'Sequence'):
+    collections.Sequence = collections.abc.Sequence
 
 import base64
 from pathlib import Path
