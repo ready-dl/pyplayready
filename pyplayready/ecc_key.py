@@ -11,15 +11,14 @@ from ecpy.curves import Curve, Point
 
 
 class ECCKey:
-    def __init__(
-            self,
-            key: EccKey
-    ):
-        """Represents a PlayReady ECC key"""
+    """Represents a PlayReady ECC key"""
+
+    def __init__(self, key: EccKey):
         self.key = key
 
     @classmethod
     def generate(cls):
+        """Generate a new ECC key pair"""
         return cls(key=ECC.generate(curve='P-256'))
 
     @classmethod
@@ -29,6 +28,7 @@ class ECCKey:
             public_key_x: Union[bytes, int],
             public_key_y: Union[bytes, int]
     ):
+        """Construct an ECC key pair from private/public bytes/ints"""
         if isinstance(private_key, bytes):
             private_key = int.from_bytes(private_key, 'big')
         if not isinstance(private_key, int):

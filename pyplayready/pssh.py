@@ -38,10 +38,13 @@ class _PlayreadyPSSHStructs:
 
 
 class PSSH(_PlayreadyPSSHStructs):
+    """Represents a PlayReady PSSH"""
+
     SYSTEM_ID = UUID(hex="9a04f07998404286ab92e65be0885f95")
 
     def __init__(self, data: Union[str, bytes]):
-        """Represents a PlayReady PSSH"""
+        """Load a PSSH Box, PlayReady Header or PlayReady Object"""
+
         if not data:
             raise InvalidPssh("Data must not be empty")
 
@@ -83,7 +86,12 @@ class PSSH(_PlayreadyPSSHStructs):
             )
         ))
 
-    def get_wrm_headers(self, downgrade_to_v4: bool = False):
+    def get_wrm_headers(self, downgrade_to_v4: bool = False) -> List[str]:
+        """
+        Return a list of all WRM Headers in the PSSH as plaintext strings
+
+        downgrade_to_v4: Downgrade the WRM Header to version 4.0.0.0 to use AES-CBC instead of AES-CTR
+        """
         return list(map(
             lambda wrm_header: wrm_header.to_v4_0_0_0() if downgrade_to_v4 else wrm_header.dumps(),
             self.wrm_headers

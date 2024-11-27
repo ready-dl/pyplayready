@@ -185,6 +185,8 @@ class _BCertStructs:
 
 
 class Certificate(_BCertStructs):
+    """Represents a BCert"""
+
     def __init__(
             self,
             parsed_bcert: Container,
@@ -263,7 +265,7 @@ class Certificate(_BCertStructs):
             key=signing_key.public_bytes(),
             usages_count=1,
             usages=ListContainer([
-                1
+                1  # KEYUSAGE_SIGN
             ])
         )
         cert_key_encrypt = Container(
@@ -273,7 +275,7 @@ class Certificate(_BCertStructs):
             key=encryption_key.public_bytes(),
             usages_count=1,
             usages=ListContainer([
-                2
+                2  # KEYUSAGE_ENCRYPT_KEY
             ])
         )
         key_info = Container(
@@ -380,6 +382,8 @@ class Certificate(_BCertStructs):
 
 
 class CertificateChain(_BCertStructs):
+    """Represents a BCertChain"""
+
     def __init__(
             self,
             parsed_bcert_chain: Container,

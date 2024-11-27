@@ -200,13 +200,15 @@ class _XMRLicenseStructs:
 
 
 class XMRLicense(_XMRLicenseStructs):
+    """Represents an XMRLicense"""
+
     def __init__(
             self,
             parsed_license: Container,
             license_obj: _XMRLicenseStructs.XmrLicense = _XMRLicenseStructs.XmrLicense
     ):
         self.parsed = parsed_license
-        self._LICENSE = license_obj
+        self._license_obj = license_obj
 
     @classmethod
     def loads(cls, data: Union[str, bytes]) -> XMRLicense:
@@ -229,10 +231,10 @@ class XMRLicense(_XMRLicenseStructs):
             return cls.loads(f.read())
 
     def dumps(self) -> bytes:
-        return self._LICENSE.build(self.parsed)
+        return self._license_obj.build(self.parsed)
 
     def struct(self) -> _XMRLicenseStructs.XmrLicense:
-        return self._LICENSE
+        return self._license_obj
 
     def _locate(self, container: Container):
         if container.flags == 2 or container.flags == 3:

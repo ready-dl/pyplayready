@@ -5,6 +5,8 @@ from pyplayready.elgamal import ElGamal
 
 
 class XmlKey:
+    """Represents a PlayReady XMLKey"""
+
     def __init__(self):
         self._shared_point = ECCKey.generate()
         self.shared_key_x = self._shared_point.key.pointQ.x

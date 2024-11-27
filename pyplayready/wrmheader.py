@@ -1,4 +1,5 @@
 import base64
+import binascii
 from enum import Enum
 from typing import Optional, List, Union, Tuple
 
@@ -6,6 +7,8 @@ import xmltodict
 
 
 class WRMHeader:
+    """Represents a PlayReady WRM Header"""
+
     class SignedKeyID:
         def __init__(
                 self,
@@ -33,18 +36,16 @@ class WRMHeader:
 
     _RETURN_STRUCTURE = Tuple[List[SignedKeyID], Union[str, None], Union[str, None], Union[str, None]]
 
-    def __init__(
-            self,
-            data: Union[str, bytes]
-    ):
-        """Represents a PlayReady WRM Header"""
+    def __init__(self, data: Union[str, bytes]):
+        """Load a WRM Header from either a string, base64 encoded data or bytes"""
+
         if not data:
             raise ValueError("Data must not be empty")
 
         if isinstance(data, str):
             try:
                 data = base64.b64decode(data).decode()
-            except Exception:
+            except (binascii.Error, binascii.Incomplete):
                 data = data.encode()
 
         self._raw_data: bytes = data
@@ -63,7 +64,11 @@ class WRMHeader:
         return element
 
     def to_v4_0_0_0(self) -> str:
-        """Will ignore any remaining Key IDs if there's more than just one"""
+        """
+        Build a v4.0.0.0 WRM header from any possible WRM Header version
+
+        Note: Will ignore any remaining Key IDs if there's more than just one
+        """
         return self._build_v4_0_0_0_wrm_header(*self.read_attributes())
 
     @staticmethod
@@ -146,6 +151,12 @@ class WRMHeader:
         )
 
     def read_attributes(self) -> _RETURN_STRUCTURE:
+        """
+        Read any non-custom XML attributes
+
+        Returns a tuple structured like this: Tuple[List[SignedKeyID], <LA_URL>, <LUI_URL>, <DS_ID>]
+        """
+
         data = self._header.get("DATA")
         if not data:
             raise ValueError("Not a valid PlayReady Header Record, WRMHEADER/DATA required")

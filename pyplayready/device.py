@@ -40,6 +40,7 @@ class _DeviceStructs:
 
 
 class Device:
+    """Represents a PlayReady Device (.prd)"""
     CURRENT_STRUCT = _DeviceStructs.v2
 
     def __init__(

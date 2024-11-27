@@ -11,6 +11,7 @@ class Key:
         RC4 = 0x0002
         AES128ECB = 0x0003
         Cocktail = 0x0004
+        AES128CBC = 0x0005
         UNKNOWN = 0xffff
 
         @classmethod
@@ -23,6 +24,7 @@ class Key:
         ChainedLicense = 0x0002
         ECC256 = 0x0003
         ECCforScalableLicenses = 0x0004
+        Scalable = 0x0005
         UNKNOWN = 0xffff
 
         @classmethod
@@ -47,7 +49,7 @@ class Key:
     def kid_to_uuid(kid: Union[str, bytes]) -> UUID:
         """
         Convert a Key ID from a string or bytes to a UUID object.
-        At first this may seem very simple but some types of Key IDs
+        At first, this may seem very simple, but some types of Key IDs
         may not be 16 bytes and some may be decimal vs. hex.
         """
         if isinstance(kid, str):
