@@ -5,11 +5,11 @@ from typing import Any, Optional, Union
 from aiohttp.typedefs import Handler
 from aiohttp import web
 
-from pyplayready import __version__
+from pyplayready import __version__, PSSH
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
 
-from pyplayready.exceptions import (InvalidSession, TooManySessions, InvalidLicense)
+from pyplayready.exceptions import (InvalidSession, TooManySessions, InvalidLicense, InvalidPssh)
 
 routes = web.RouteTableDef()
 
@@ -134,6 +134,18 @@ async def get_license_challenge(request: web.Request) -> web.Response:
     # get init data
     init_data = body["init_data"]
 
+    if not init_data.startswith("<WRMHEADER"):
+        try:
+            pssh = PSSH(init_data)
+            wrm_headers = pssh.get_wrm_headers(downgrade_to_v4=True)
+            if wrm_headers:
+                init_data = wrm_headers[0]
+        except InvalidPssh as e:
+            return web.json_response({
+                "status": 500,
+                "message": f"Unable to parse base64 PSSH, {e}"
+            }, status=500)
+
     # get challenge
     try:
         license_request = cdm.get_license_challenge(
@@ -147,9 +159,9 @@ async def get_license_challenge(request: web.Request) -> web.Response:
         }, status=400)
     except Exception as e:
         return web.json_response({
-            "status": 400,
+            "status": 500,
             "message": f"Error, {e}"
-        }, status=400)
+        }, status=500)
 
     return web.json_response({
         "status": 200,
@@ -199,9 +211,9 @@ async def parse_license(request: web.Request) -> web.Response:
         }, status=400)
     except Exception as e:
         return web.json_response({
-            "status": 400,
+            "status": 500,
             "message": f"Error, {e}"
-        }, status=400)
+        }, status=500)
 
     return web.json_response({
         "status": 200,
@@ -243,9 +255,9 @@ async def get_keys(request: web.Request) -> web.Response:
         }, status=400)
     except Exception as e:
         return web.json_response({
-            "status": 400,
+            "status": 500,
             "message": f"Error, {e}"
-        }, status=400)
+        }, status=500)
 
     # get the keys in json form
     keys_json = [

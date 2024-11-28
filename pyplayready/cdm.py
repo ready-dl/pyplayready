@@ -265,7 +265,7 @@ class Cdm:
                     raise InvalidLicense("Public encryption key does not match")
 
                 for key in parsed_licence.get_content_keys():
-                    if Key.CipherType(key.cipher_type) == Key.CipherType.ECC256:
+                    if Key.CipherType(key.cipher_type) == Key.CipherType.ECC_256:
                         session.keys.append(Key(
                             key_id=UUID(bytes_le=key.key_id),
                             key_type=key.key_type,

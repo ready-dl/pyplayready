@@ -6,12 +6,12 @@ from typing import Union
 
 class Key:
     class KeyType(Enum):
-        Invalid = 0x0000
-        AES128CTR = 0x0001
-        RC4 = 0x0002
-        AES128ECB = 0x0003
-        Cocktail = 0x0004
-        AES128CBC = 0x0005
+        INVALID = 0x0000
+        AES_128_CTR = 0x0001
+        RC4_CIPHER = 0x0002
+        AES_128_ECB = 0x0003
+        COCKTAIL = 0x0004
+        AES_128_CBC = 0x0005
         UNKNOWN = 0xffff
 
         @classmethod
@@ -19,12 +19,12 @@ class Key:
             return cls.UNKNOWN
 
     class CipherType(Enum):
-        Invalid = 0x0000
-        RSA128 = 0x0001
-        ChainedLicense = 0x0002
-        ECC256 = 0x0003
-        ECCforScalableLicenses = 0x0004
-        Scalable = 0x0005
+        INVALID = 0x0000
+        RSA_1024 = 0x0001
+        CHAINED_LICENSE = 0x0002
+        ECC_256 = 0x0003
+        ECC_256_WITH_KZ = 0x0004
+        SCALABLE = 0x0005
         UNKNOWN = 0xffff
 
         @classmethod
