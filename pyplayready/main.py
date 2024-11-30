@@ -277,9 +277,10 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
     log.info(f"L{device.security_level} {device.get_name()}")
     log.info(f"Saving to: {out_path}")
 
-    group_key_path = out_path / "zgpriv.dat"
-    group_key_path.write_bytes(device.group_key.dumps())
-    log.info("Exported Group Key as zgpriv.dat")
+    if device.group_key:
+        group_key_path = out_path / "zgpriv.dat"
+        group_key_path.write_bytes(device.group_key.dumps())
+        log.info("Exported Group Key as zgpriv.dat")
 
     private_key_path = out_path / "zprivencr.dat"
     private_key_path.write_bytes(device.encryption_key.dumps())
