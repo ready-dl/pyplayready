@@ -250,7 +250,7 @@ def reprovision_device(ctx: click.Context, prd_path: Path, output: Optional[Path
 @click.pass_context
 def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = None) -> None:
     """
-    Export a Playready Device (.prd) file to a Group Key, Encryption Key, Signing Key and Group Certificate
+    Export a Playready Device (.prd) file to a Group Key and Group Certificate
     If an output directory is not specified, it will be stored in the current working directory
     """
     if not prd_path.is_file():
@@ -274,21 +274,18 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
 
     device = Device.load(prd_path)
 
-    log.info(f"L{device.security_level} {device.get_name()}")
+    log.info(f"SL{device.security_level} {device.get_name()}")
     log.info(f"Saving to: {out_path}")
 
     if device.group_key:
         group_key_path = out_path / "zgpriv.dat"
         group_key_path.write_bytes(device.group_key.dumps())
         log.info("Exported Group Key as zgpriv.dat")
+    else:
+        log.warning("Cannot export zgpriv.dat, as v2 devices do not save the group key")
 
-    private_key_path = out_path / "zprivencr.dat"
-    private_key_path.write_bytes(device.encryption_key.dumps())
-    log.info("Exported Encryption Key as zprivencr.dat")
-
-    private_key_path = out_path / "zprivsig.dat"
-    private_key_path.write_bytes(device.signing_key.dumps())
-    log.info("Exported Signing Key as zprivsig.dat")
+    # remove leaf cert to unprovision it
+    device.group_certificate.remove(0)
 
     client_id_path = out_path / "bgroupcert.dat"
     client_id_path.write_bytes(device.group_certificate.dumps())
