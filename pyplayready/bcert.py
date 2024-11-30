@@ -1,6 +1,10 @@
 from __future__ import annotations
 import collections.abc
 
+from Crypto.PublicKey import ECC
+
+from pyplayready.exceptions import InvalidCertificateChain
+
 # monkey patch for construct 2.8.8 compatibility
 if not hasattr(collections, 'Sequence'):
     collections.Sequence = collections.abc.Sequence
@@ -51,7 +55,7 @@ class _BCertStructs:
     )
 
     DrmBCertFeatureInfo = Struct(
-        "feature_count" / Int32ub,
+        "feature_count" / Int32ub,  # max. 32
         "features" / Array(this.feature_count, Int32ub)
     )
 
@@ -100,8 +104,8 @@ class _BCertStructs:
 
     # TODO: untested
     DrmBCertExtDataSignKeyInfo = Struct(
-        "type" / Int16ub,
-        "length" / Int16ub,
+        "key_type" / Int16ub,
+        "key_length" / Int16ub,
         "flags" / Int32ub,
         "key" / Bytes(this.length // 8)
     )
@@ -121,7 +125,7 @@ class _BCertStructs:
 
     # TODO: untested
     BCertExtDataContainer = Struct(
-        "record_count" / Int32ub,
+        "record_count" / Int32ub,  # always 1
         "records" / Array(this.record_count, BCertExtDataRecord),
         "signature" / DrmBCertExtDataSignature
     )
@@ -380,6 +384,26 @@ class Certificate(_BCertStructs):
     def struct(self) -> _BCertStructs.BCert:
         return self._BCERT
 
+    def verify_signature(self):
+        sign_payload = self.dumps()[:-144]
+        signature_attribute = self.get_attribute(8).attribute
+
+        raw_signature_key = signature_attribute.signature_key
+        signature_key = ECC.construct(
+            curve='P-256',
+            point_x=int.from_bytes(raw_signature_key[:32], 'big'),
+            point_y=int.from_bytes(raw_signature_key[32:], 'big')
+        )
+
+        hash_obj = SHA256.new(sign_payload)
+        verifier = DSS.new(signature_key, 'fips-186-3')
+
+        try:
+            verifier.verify(hash_obj, signature_attribute.signature)
+            return True
+        except ValueError:
+            return False
+
 
 class CertificateChain(_BCertStructs):
     """Represents a BCertChain"""
@@ -437,3 +461,25 @@ class CertificateChain(_BCertStructs):
         self.parsed.certificate_count += 1
         self.parsed.certificates.insert(0, bcert.parsed)
         self.parsed.total_length += len(bcert.dumps())
+
+    def remove(self, index: int) -> None:
+        if self.parsed.certificate_count <= 0:
+            raise InvalidCertificateChain("CertificateChain does not contain any Certificates")
+        if index >= self.parsed.certificate_count:
+            raise IndexError(f"No Certificate at index {index}, {self.parsed.certificate_count} total")
+
+        self.parsed.certificate_count -= 1
+        bcert = Certificate(self.parsed.certificates[index])
+        self.parsed.total_length -= len(bcert.dumps())
+        self.parsed.certificates.pop(index)
+
+    def get(self, index: int) -> Certificate:
+        if self.parsed.certificate_count <= 0:
+            raise InvalidCertificateChain("CertificateChain does not contain any Certificates")
+        if index >= self.parsed.certificate_count:
+            raise IndexError(f"No Certificate at index {index}, {self.parsed.certificate_count} total")
+
+        return Certificate(self.parsed.certificates[index])
+
+    def count(self) -> int:
+        return self.parsed.certificate_count

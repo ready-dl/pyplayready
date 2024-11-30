@@ -12,6 +12,7 @@ from pyplayready.bcert import CertificateChain, Certificate
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
 from pyplayready.ecc_key import ECCKey
+from pyplayready.exceptions import OutdatedDevice
 from pyplayready.pssh import PSSH
 
 
@@ -144,8 +145,8 @@ def create_device(
     encryption_key = ECCKey.generate()
     signing_key = ECCKey.generate()
 
-    certificate_chain = CertificateChain.load(group_certificate)
     group_key = ECCKey.load(group_key)
+    certificate_chain = CertificateChain.load(group_certificate)
 
     new_certificate = Certificate.new_leaf_cert(
         cert_id=get_random_bytes(16),
@@ -159,12 +160,11 @@ def create_device(
     certificate_chain.prepend(new_certificate)
 
     device = Device(
-        group_certificate=certificate_chain.dumps(),
+        group_key=group_key.dumps(),
         encryption_key=encryption_key.dumps(),
-        signing_key=signing_key.dumps()
+        signing_key=signing_key.dumps(),
+        group_certificate=certificate_chain.dumps(),
     )
-
-    prd_bin = device.dumps()
 
     if output and output.suffix:
         if output.suffix.lower() != ".prd":
@@ -179,14 +179,69 @@ def create_device(
         return
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_bytes(prd_bin)
+    out_path.write_bytes(device.dumps())
 
     log.info("Created Playready Device (.prd) file, %s", out_path.name)
     log.info(" + Security Level: %s", device.security_level)
-    log.info(" + Group Certificate: %s (%s bytes)", bool(device.group_certificate.dumps()), len(device.group_certificate.dumps()))
-    log.info(" + Encryption Key: %s (%s bytes)", bool(device.encryption_key.dumps()), len(device.encryption_key.dumps()))
-    log.info(" + Signing Key: %s (%s bytes)", bool(device.signing_key.dumps()), len(device.signing_key.dumps()))
+    log.info(" + Group Key: %s bytes", len(device.group_key.dumps()))
+    log.info(" + Encryption Key: %s bytes", len(device.encryption_key.dumps()))
+    log.info(" + Signing Key: %s bytes", len(device.signing_key.dumps()))
+    log.info(" + Group Certificate: %s bytes", len(device.group_certificate.dumps()))
     log.info(" + Saved to: %s", out_path.absolute())
+
+
+@main.command()
+@click.argument("prd_path", type=Path)
+@click.option("-o", "--output", type=Path, default=None, help="Output Path or Directory")
+@click.pass_context
+def reprovision_device(ctx: click.Context, prd_path: Path, output: Optional[Path] = None) -> None:
+    """
+    Reprovision a Playready Device (.prd) by creating a new leaf certificate and new encryption/signing keys.
+    Will override the device if an output path or directory is not specified
+
+    Only works on PRD Devices of v3 or higher
+    """
+    if not prd_path.is_file():
+        raise click.UsageError("prd_path: Not a path to a file, or it doesn't exist.", ctx)
+
+    log = logging.getLogger("reprovision-device")
+    log.info("Reprovisioning Playready Device (.prd) file, %s", prd_path.name)
+
+    device = Device.load(prd_path)
+
+    if device.group_key is None:
+        raise OutdatedDevice("Device does not support reprovisioning, re-create it or use a Device with a version of 3 or higher")
+
+    device.group_certificate.remove(0)
+
+    encryption_key = ECCKey.generate()
+    signing_key = ECCKey.generate()
+
+    device.encryption_key = encryption_key
+    device.signing_key = signing_key
+
+    new_certificate = Certificate.new_leaf_cert(
+        cert_id=get_random_bytes(16),
+        security_level=device.group_certificate.get_security_level(),
+        client_id=get_random_bytes(16),
+        signing_key=signing_key,
+        encryption_key=encryption_key,
+        group_key=device.group_key,
+        parent=device.group_certificate
+    )
+    device.group_certificate.prepend(new_certificate)
+
+    if output and output.suffix:
+        if output.suffix.lower() != ".prd":
+            log.warning(f"Saving PRD with the file extension '{output.suffix}' but '.prd' is recommended.")
+        out_path = output
+    else:
+        out_path = prd_path
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(device.dumps())
+
+    log.info("Reprovisioned Playready Device (.prd) file, %s", out_path.name)
 
 
 @main.command()
@@ -195,7 +250,7 @@ def create_device(
 @click.pass_context
 def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = None) -> None:
     """
-    Export a Playready Device (.prd) file to a Group Certificate, Encryption Key and Signing Key
+    Export a Playready Device (.prd) file to a Group Key, Encryption Key, Signing Key and Group Certificate
     If an output directory is not specified, it will be stored in the current working directory
     """
     if not prd_path.is_file():
@@ -222,9 +277,9 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
     log.info(f"L{device.security_level} {device.get_name()}")
     log.info(f"Saving to: {out_path}")
 
-    client_id_path = out_path / "bgroupcert.dat"
-    client_id_path.write_bytes(device.group_certificate.dumps())
-    log.info("Exported Group Certificate to bgroupcert.dat")
+    group_key_path = out_path / "zgpriv.dat"
+    group_key_path.write_bytes(device.group_key.dumps())
+    log.info("Exported Group Key as zgpriv.dat")
 
     private_key_path = out_path / "zprivencr.dat"
     private_key_path.write_bytes(device.encryption_key.dumps())
@@ -233,6 +288,10 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
     private_key_path = out_path / "zprivsig.dat"
     private_key_path.write_bytes(device.signing_key.dumps())
     log.info("Exported Signing Key as zprivsig.dat")
+
+    client_id_path = out_path / "bgroupcert.dat"
+    client_id_path.write_bytes(device.group_certificate.dumps())
+    log.info("Exported Group Certificate to bgroupcert.dat")
 
 
 @main.command("serve", short_help="Serve your local CDM and Playready Devices Remotely.")
@@ -243,16 +302,14 @@ def serve_(config_path: Path, host: str, port: int) -> None:
     """
     Serve your local CDM and Playready Devices Remotely.
 
-    \b
     [CONFIG] is a path to a serve config file.
     See `serve.example.yml` for an example config file.
 
-    \b
     Host as 127.0.0.1 may block remote access even if port-forwarded.
     Instead, use 0.0.0.0 and ensure the TCP port you choose is forwarded.
     """
-    from pyplayready import serve  # isort:skip
-    import yaml  # isort:skip
+    from pyplayready import serve
+    import yaml
 
     config = yaml.safe_load(config_path.read_text(encoding="utf8"))
     serve.run(config, host, port)

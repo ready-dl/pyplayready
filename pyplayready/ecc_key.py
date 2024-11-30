@@ -22,27 +22,12 @@ class ECCKey:
         return cls(key=ECC.generate(curve='P-256'))
 
     @classmethod
-    def construct(
-            cls,
-            private_key: Union[bytes, int],
-            public_key_x: Union[bytes, int],
-            public_key_y: Union[bytes, int]
-    ):
+    def construct(cls, private_key: Union[bytes, int]):
         """Construct an ECC key pair from private/public bytes/ints"""
         if isinstance(private_key, bytes):
             private_key = int.from_bytes(private_key, 'big')
         if not isinstance(private_key, int):
             raise ValueError(f"Expecting Bytes or Int input, got {private_key!r}")
-
-        if isinstance(public_key_x, bytes):
-            public_key_x = int.from_bytes(public_key_x, 'big')
-        if not isinstance(public_key_x, int):
-            raise ValueError(f"Expecting Bytes or Int input, got {public_key_x!r}")
-
-        if isinstance(public_key_y, bytes):
-            public_key_y = int.from_bytes(public_key_y, 'big')
-        if not isinstance(public_key_y, int):
-            raise ValueError(f"Expecting Bytes or Int input, got {public_key_y!r}")
 
         # The public is always derived from the private key; loading the other stuff won't work
         key = ECC.construct(
@@ -62,11 +47,7 @@ class ECCKey:
         if len(data) not in [96, 32]:
             raise ValueError(f"Invalid data length. Expecting 96 or 32 bytes, got {len(data)}")
 
-        return cls.construct(
-            private_key=data[:32],
-            public_key_x=data[32:64],
-            public_key_y=data[64:96]
-        )
+        return cls.construct(private_key=data[:32])
 
     @classmethod
     def load(cls, path: Union[Path, str]) -> ECCKey:

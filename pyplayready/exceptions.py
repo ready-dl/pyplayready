@@ -24,3 +24,11 @@ class DeviceMismatch(PyPlayreadyException):
 
 class InvalidLicense(PyPlayreadyException):
     """Unable to parse XMR License."""
+
+
+class InvalidCertificateChain(PyPlayreadyException):
+    """The BCert is not correctly formatted."""
+
+
+class OutdatedDevice(PyPlayreadyException):
+    """The PlayReady Device is outdated and does not support a specific operation."""
