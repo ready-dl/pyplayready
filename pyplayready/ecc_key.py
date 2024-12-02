@@ -56,15 +56,17 @@ class ECCKey:
         with Path(path).open(mode="rb") as f:
             return cls.loads(f.read())
 
-    def dumps(self):
+    def dumps(self, private_only=False):
+        if private_only:
+            return self.private_bytes()
         return self.private_bytes() + self.public_bytes()
 
-    def dump(self, path: Union[Path, str]) -> None:
+    def dump(self, path: Union[Path, str], private_only=False) -> None:
         if not isinstance(path, (Path, str)):
             raise ValueError(f"Expecting Path object or path string, got {path!r}")
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(self.dumps())
+        path.write_bytes(self.dumps(private_only))
 
     def get_point(self, curve: Curve) -> Point:
         return Point(self.key.pointQ.x, self.key.pointQ.y, curve)

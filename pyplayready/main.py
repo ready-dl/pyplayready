@@ -279,7 +279,7 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
 
     if device.group_key:
         group_key_path = out_path / "zgpriv.dat"
-        group_key_path.write_bytes(device.group_key.dumps())
+        group_key_path.write_bytes(device.group_key.dumps(private_only=True))
         log.info("Exported Group Key as zgpriv.dat")
     else:
         log.warning("Cannot export zgpriv.dat, as v2 devices do not save the group key")

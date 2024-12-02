@@ -214,11 +214,6 @@ class Certificate(_BCertStructs):
             max_header: int = 15360,
             max_chain_depth: int = 2
     ) -> Certificate:
-        if not cert_id:
-            raise ValueError("Certificate ID is required")
-        if not client_id:
-            raise ValueError("Client ID is required")
-
         basic_info = Container(
             cert_id=cert_id,
             security_level=security_level,
@@ -250,9 +245,20 @@ class Certificate(_BCertStructs):
         feature = Container(
             feature_count=3,
             features=ListContainer([
-                4,  # SECURE_CLOCK
-                9,  # REVOCATION_LIST_FEATURE
-                13  # SUPPORTS_PR3_FEATURES
+                # 1,  # Transmitter
+                # 2,  # Receiver
+                # 3,  # SharedCertificate
+                4,  # SecureClock
+                5,  # AntiRollBackClock
+                # 6, # ReservedMetering
+                # 7, # ReservedLicSync
+                # 8, # ReservedSymOpt
+                9,  # CRLS (Revocation Lists)
+                # 10, # ServerBasicEdition
+                # 11, # ServerStandardEdition
+                # 12, # ServerPremiumEdition
+                13,  # PlayReady3Features
+                # 14, # DeprecatedSecureStop
             ])
         )
         feature_attribute = Container(
@@ -385,8 +391,10 @@ class Certificate(_BCertStructs):
         return self._BCERT
 
     def verify_signature(self):
-        sign_payload = self.dumps()[:-144]
-        signature_attribute = self.get_attribute(8).attribute
+        signature_object = self.get_attribute(8)
+        signature_attribute = signature_object.attribute
+
+        sign_payload = self.dumps()[:-signature_object.length]
 
         raw_signature_key = signature_attribute.signature_key
         signature_key = ECC.construct(
