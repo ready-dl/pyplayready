@@ -243,7 +243,7 @@ class Certificate(_BCertStructs):
         )
 
         feature = Container(
-            feature_count=3,
+            feature_count=4,
             features=ListContainer([
                 # 1,  # Transmitter
                 # 2,  # Receiver
