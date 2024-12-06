@@ -5,60 +5,20 @@ from enum import IntEnum
 from pathlib import Path
 from typing import Union, Any
 
-from construct import Struct, Const, Int8ub, Bytes, this, Int32ub
-
-from pyplayready.bcert import CertificateChain
-from pyplayready.ecc_key import ECCKey
-
-
-class SecurityLevel(IntEnum):
-    SL150 = 150
-    SL2000 = 2000
-    SL3000 = 3000
-
-
-class _DeviceStructs:
-    magic = Const(b"PRD")
-
-    header = Struct(
-        "signature" / magic,
-        "version" / Int8ub,
-    )
-
-    # was never in production
-    v1 = Struct(
-        "signature" / magic,
-        "version" / Int8ub,
-        "group_key_length" / Int32ub,
-        "group_key" / Bytes(this.group_key_length),
-        "group_certificate_length" / Int32ub,
-        "group_certificate" / Bytes(this.group_certificate_length)
-    )
-
-    v2 = Struct(
-        "signature" / magic,
-        "version" / Int8ub,
-        "group_certificate_length" / Int32ub,
-        "group_certificate" / Bytes(this.group_certificate_length),
-        "encryption_key" / Bytes(96),
-        "signing_key" / Bytes(96),
-    )
-
-    v3 = Struct(
-        "signature" / magic,
-        "version" / Int8ub,
-        "group_key" / Bytes(96),
-        "encryption_key" / Bytes(96),
-        "signing_key" / Bytes(96),
-        "group_certificate_length" / Int32ub,
-        "group_certificate" / Bytes(this.group_certificate_length),
-    )
+from pyplayready.device.structs import DeviceStructs
+from pyplayready.system.bcert import CertificateChain
+from pyplayready.crypto.ecc_key import ECCKey
 
 
 class Device:
     """Represents a PlayReady Device (.prd)"""
-    CURRENT_STRUCT = _DeviceStructs.v3
+    CURRENT_STRUCT = DeviceStructs.v3
     CURRENT_VERSION = 3
+
+    class SecurityLevel(IntEnum):
+        SL150 = 150
+        SL2000 = 2000
+        SL3000 = 3000
 
     def __init__(
             self,
@@ -100,11 +60,11 @@ class Device:
         if not isinstance(data, bytes):
             raise ValueError(f"Expecting Bytes or Base64 input, got {data!r}")
 
-        prd_header = _DeviceStructs.header.parse(data)
+        prd_header = DeviceStructs.header.parse(data)
         if prd_header.version == 2:
             return cls(
                 group_key=None,
-                **_DeviceStructs.v2.parse(data)
+                **DeviceStructs.v2.parse(data)
             )
 
         return cls(**cls.CURRENT_STRUCT.parse(data))

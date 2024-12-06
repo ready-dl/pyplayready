@@ -8,12 +8,12 @@ import requests
 from Crypto.Random import get_random_bytes
 
 from pyplayready import __version__
-from pyplayready.bcert import CertificateChain, Certificate
+from pyplayready.system.bcert import CertificateChain, Certificate
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
-from pyplayready.ecc_key import ECCKey
+from pyplayready.crypto.ecc_key import ECCKey
 from pyplayready.exceptions import OutdatedDevice
-from pyplayready.pssh import PSSH
+from pyplayready.system.pssh import PSSH
 
 
 @click.group(invoke_without_command=True)
@@ -306,7 +306,7 @@ def serve_(config_path: Path, host: str, port: int) -> None:
     Host as 127.0.0.1 may block remote access even if port-forwarded.
     Instead, use 0.0.0.0 and ensure the TCP port you choose is forwarded.
     """
-    from pyplayready import serve
+    from pyplayready.remote import serve
     import yaml
 
     config = yaml.safe_load(config_path.read_text(encoding="utf8"))

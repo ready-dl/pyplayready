@@ -33,7 +33,7 @@ An example code snippet:
 ```python
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
-from pyplayready.pssh import PSSH
+from pyplayready.system.pssh import PSSH
 
 import requests
 

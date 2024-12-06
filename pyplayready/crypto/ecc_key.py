@@ -11,7 +11,7 @@ from ecpy.curves import Curve, Point
 
 
 class ECCKey:
-    """Represents a PlayReady ECC key"""
+    """Represents a PlayReady ECC key pair"""
 
     def __init__(self, key: EccKey):
         self.key = key

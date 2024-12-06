@@ -1,13 +1,14 @@
-from .bcert import *
-from .cdm import *
-from .device import *
-from .ecc_key import *
-from .elgamal import *
-from .key import *
-from .pssh import *
-from .remotecdm import *
-from .session import *
-from .xml_key import *
-from .xmrlicense import *
+from pyplayready.cdm import *
+from pyplayready.crypto.ecc_key import *
+from pyplayready.crypto.elgamal import *
+from pyplayready.device import *
+from pyplayready.license.key import *
+from pyplayready.license.xml_key import *
+from pyplayready.license.xmrlicense import *
+from pyplayready.remote.remotecdm import *
+from pyplayready.system.bcert import *
+from pyplayready.system.pssh import *
+from pyplayready.system.session import *
 
-__version__ = "0.4.3"
+
+__version__ = "0.4.4"

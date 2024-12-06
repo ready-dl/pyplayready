@@ -3,6 +3,7 @@ import collections.abc
 
 from Crypto.PublicKey import ECC
 
+from pyplayready.crypto import Crypto
 from pyplayready.exceptions import InvalidCertificateChain
 
 # monkey patch for construct 2.8.8 compatibility
@@ -13,13 +14,11 @@ import base64
 from pathlib import Path
 from typing import Union
 
-from Crypto.Hash import SHA256
-from Crypto.Signature import DSS
 from construct import Bytes, Const, Int32ub, GreedyRange, Switch, Container, ListContainer
 from construct import Int16ub, Array
 from construct import Struct, this
 
-from pyplayready.ecc_key import ECCKey
+from pyplayready.crypto.ecc_key import ECCKey
 
 
 class _BCertStructs:
@@ -249,7 +248,7 @@ class Certificate(_BCertStructs):
                 # 2,  # Receiver
                 # 3,  # SharedCertificate
                 4,  # SecureClock
-                5,  # AntiRollBackClock
+                # 5, # AntiRollBackClock
                 # 6, # ReservedMetering
                 # 7, # ReservedLicSync
                 # 8, # ReservedSymOpt
@@ -323,10 +322,7 @@ class Certificate(_BCertStructs):
         new_bcert_container.total_length = len(payload) + 144  # signature length
 
         sign_payload = _BCertStructs.BCert.build(new_bcert_container)
-
-        hash_obj = SHA256.new(sign_payload)
-        signer = DSS.new(group_key.key, 'fips-186-3')
-        signature = signer.sign(hash_obj)
+        signature = Crypto.ecc256_sign(group_key, sign_payload)
 
         signature_info = Container(
             signature_type=1,
@@ -403,14 +399,11 @@ class Certificate(_BCertStructs):
             point_y=int.from_bytes(raw_signature_key[32:], 'big')
         )
 
-        hash_obj = SHA256.new(sign_payload)
-        verifier = DSS.new(signature_key, 'fips-186-3')
-
-        try:
-            verifier.verify(hash_obj, signature_attribute.signature)
-            return True
-        except ValueError:
-            return False
+        return Crypto.ecc256_verify(
+            public_key=signature_key,
+            data=sign_payload,
+            signature=signature_attribute.signature
+        )
 
 
 class CertificateChain(_BCertStructs):
