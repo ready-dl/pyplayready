@@ -88,7 +88,7 @@ class Device:
             ))
         except:
             return DeviceStructs.v2.build(dict(
-                version=self.CURRENT_VERSION,
+                version=2,
                 group_certificate_length=len(self.group_certificate.dumps()),
                 group_certificate=self.group_certificate.dumps(),
                 encryption_key=self.encryption_key.dumps(),
