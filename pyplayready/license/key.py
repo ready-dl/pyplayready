@@ -12,6 +12,7 @@ class Key:
         AES_128_ECB = 0x0003
         COCKTAIL = 0x0004
         AES_128_CBC = 0x0005
+        KEYEXCHANGE = 0x0006
         UNKNOWN = 0xffff
 
         @classmethod
@@ -24,7 +25,8 @@ class Key:
         CHAINED_LICENSE = 0x0002
         ECC_256 = 0x0003
         ECC_256_WITH_KZ = 0x0004
-        SCALABLE = 0x0005
+        TEE_TRANSIENT = 0x0005
+        ECC_256_VIA_SYMMETRIC = 0x0006
         UNKNOWN = 0xffff
 
         @classmethod

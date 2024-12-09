@@ -249,5 +249,4 @@ class XMRLicense(_XMRLicenseStructs):
                 yield container.data
 
     def get_content_keys(self):
-        for content_key in self.get_object(10):
-            yield content_key
+        yield from self.get_object(10)

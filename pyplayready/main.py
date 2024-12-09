@@ -8,12 +8,12 @@ import requests
 from Crypto.Random import get_random_bytes
 
 from pyplayready import __version__
-from pyplayready.bcert import CertificateChain, Certificate
+from pyplayready.system.bcert import CertificateChain, Certificate
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
-from pyplayready.ecc_key import ECCKey
+from pyplayready.crypto.ecc_key import ECCKey
 from pyplayready.exceptions import OutdatedDevice
-from pyplayready.pssh import PSSH
+from pyplayready.system.pssh import PSSH
 
 
 @click.group(invoke_without_command=True)
@@ -279,7 +279,7 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
 
     if device.group_key:
         group_key_path = out_path / "zgpriv.dat"
-        group_key_path.write_bytes(device.group_key.dumps())
+        group_key_path.write_bytes(device.group_key.dumps(private_only=True))
         log.info("Exported Group Key as zgpriv.dat")
     else:
         log.warning("Cannot export zgpriv.dat, as v2 devices do not save the group key")
@@ -306,7 +306,7 @@ def serve_(config_path: Path, host: str, port: int) -> None:
     Host as 127.0.0.1 may block remote access even if port-forwarded.
     Instead, use 0.0.0.0 and ensure the TCP port you choose is forwarded.
     """
-    from pyplayready import serve
+    from pyplayready.remote import serve
     import yaml
 
     config = yaml.safe_load(config_path.read_text(encoding="utf8"))

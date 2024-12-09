@@ -5,7 +5,7 @@ from uuid import UUID
 from construct import Struct, Int32ul, Int16ul, Array, this, Bytes, Switch, Int32ub, Const, Container, ConstructError
 
 from pyplayready.exceptions import InvalidPssh
-from pyplayready.wrmheader import WRMHeader
+from pyplayready.system.wrmheader import WRMHeader
 
 
 class _PlayreadyPSSHStructs:

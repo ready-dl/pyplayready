@@ -10,23 +10,21 @@ import xml.etree.ElementTree as ET
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
-from Crypto.Signature import DSS
 from Crypto.Util.Padding import pad
+
 from ecpy.curves import Point, Curve
 
-from pyplayready.bcert import CertificateChain
-from pyplayready.ecc_key import ECCKey
-from pyplayready.key import Key
-from pyplayready.xml_key import XmlKey
-from pyplayready.elgamal import ElGamal
-from pyplayready.xmrlicense import XMRLicense
-
+from pyplayready.crypto import Crypto
+from pyplayready.system.bcert import CertificateChain
+from pyplayready.crypto.ecc_key import ECCKey
+from pyplayready.license.key import Key
+from pyplayready.license.xml_key import XmlKey
+from pyplayready.license.xmrlicense import XMRLicense
 from pyplayready.exceptions import (InvalidSession, TooManySessions, InvalidLicense)
-from pyplayready.session import Session
+from pyplayready.system.session import Session
 
 
 class Cdm:
-
     MAX_NUM_OF_SESSIONS = 16
 
     def __init__(
@@ -45,13 +43,11 @@ class Cdm:
         self.client_version = client_version
         self.protocol_version = protocol_version
 
-        self.curve = Curve.get_curve("secp256r1")
-        self.elgamal = ElGamal(self.curve)
-
+        self.__crypto = Crypto()
         self._wmrm_key = Point(
             x=0xc8b6af16ee941aadaa5389b4af2c10e356be42af175ef3face93254e7b0b3d9b,
             y=0x982b27b5cb2341326e56aa857dbfd5c634ce2cf9ea74fca8f2af5957efeea562,
-            curve=self.curve
+            curve=Curve.get_curve("secp256r1")
         )
 
         self.__sessions: dict[bytes, Session] = {}
@@ -98,11 +94,10 @@ class Cdm:
         del self.__sessions[session_id]
 
     def _get_key_data(self, session: Session) -> bytes:
-        point1, point2 = self.elgamal.encrypt(
-            message_point=session.xml_key.get_point(self.elgamal.curve),
-            public_key=self._wmrm_key
+        return self.__crypto.ecc256_encrypt(
+            public_key=self._wmrm_key,
+            plaintext=session.xml_key.get_point()
         )
-        return self.elgamal.to_bytes(point1.x) + self.elgamal.to_bytes(point1.y) + self.elgamal.to_bytes(point2.x) + self.elgamal.to_bytes(point2.y)
 
     def _get_cipher_data(self, session: Session) -> bytes:
         b64_chain = base64.b64encode(self.certificate_chain.dumps()).decode()
@@ -190,10 +185,7 @@ class Cdm:
         la_hash = la_hash_obj.digest()
 
         signed_info = self._build_signed_info(base64.b64encode(la_hash).decode())
-        signed_info_digest = SHA256.new(signed_info.encode())
-
-        signer = DSS.new(session.signing_key.key, 'fips-186-3')
-        signature = signer.sign(signed_info_digest)
+        signature = self.__crypto.ecc256_sign(session.signing_key, signed_info.encode())
 
         # haven't found a better way to do this. xmltodict.unparse doesn't work
         main_body = (
@@ -224,23 +216,8 @@ class Cdm:
 
         return main_body
 
-    def _decrypt_ecc256_key(self, session: Session, encrypted_key: bytes) -> bytes:
-        point1 = Point(
-            x=int.from_bytes(encrypted_key[:32], 'big'),
-            y=int.from_bytes(encrypted_key[32:64], 'big'),
-            curve=self.curve
-        )
-        point2 = Point(
-            x=int.from_bytes(encrypted_key[64:96], 'big'),
-            y=int.from_bytes(encrypted_key[96:128], 'big'),
-            curve=self.curve
-        )
-
-        decrypted = self.elgamal.decrypt((point1, point2), int(session.encryption_key.key.d))
-        return self.elgamal.to_bytes(decrypted.x)[16:32]
-
     @staticmethod
-    def _verify_ecc_key(session: Session, licence: XMRLicense) -> bool:
+    def _verify_encryption_key(session: Session, licence: XMRLicense) -> bool:
         ecc_keys = list(licence.get_object(42))
         if not ecc_keys:
             raise InvalidLicense("No ECC public key in license")
@@ -258,21 +235,29 @@ class Cdm:
         try:
             root = ET.fromstring(licence)
             license_elements = root.findall(".//{http://schemas.microsoft.com/DRM/2007/03/protocols}License")
+
             for license_element in license_elements:
                 parsed_licence = XMRLicense.loads(license_element.text)
 
-                if not self._verify_ecc_key(session, parsed_licence):
+                if not self._verify_encryption_key(session, parsed_licence):
                     raise InvalidLicense("Public encryption key does not match")
 
-                for key in parsed_licence.get_content_keys():
-                    if Key.CipherType(key.cipher_type) == Key.CipherType.ECC_256:
-                        session.keys.append(Key(
-                            key_id=UUID(bytes_le=key.key_id),
-                            key_type=key.key_type,
-                            cipher_type=key.cipher_type,
-                            key_length=key.key_length,
-                            key=self._decrypt_ecc256_key(session, key.encrypted_key)
-                        ))
+                for content_key in parsed_licence.get_content_keys():
+                    if Key.CipherType(content_key.cipher_type) == Key.CipherType.ECC_256:
+                        key = self.__crypto.ecc256_decrypt(
+                            private_key=session.encryption_key,
+                            ciphertext=content_key.encrypted_key
+                        )[16:32]
+                    else:
+                        continue
+
+                    session.keys.append(Key(
+                        key_id=UUID(bytes_le=content_key.key_id),
+                        key_type=content_key.key_type,
+                        cipher_type=content_key.cipher_type,
+                        key_length=content_key.key_length,
+                        key=key
+                    ))
         except InvalidLicense as e:
             raise InvalidLicense(e)
         except Exception as e:
