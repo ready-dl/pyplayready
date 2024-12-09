@@ -77,7 +77,7 @@ class Device:
             return cls.loads(f.read())
 
     def dumps(self) -> bytes:
-        if self.CURRENT_VERSION == 3:
+        try:
             return self.CURRENT_STRUCT.build(dict(
                 version=self.CURRENT_VERSION,
                 group_key=self.group_key.dumps(),
@@ -86,8 +86,8 @@ class Device:
                 group_certificate_length=len(self.group_certificate.dumps()),
                 group_certificate=self.group_certificate.dumps(),
             ))
-        elif self.CURRENT_VERSION == 2:
-            return self.CURRENT_STRUCT.build(dict(
+        except:
+            return DeviceStructs.v2.build(dict(
                 version=self.CURRENT_VERSION,
                 group_certificate_length=len(self.group_certificate.dumps()),
                 group_certificate=self.group_certificate.dumps(),
