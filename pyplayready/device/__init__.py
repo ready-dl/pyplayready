@@ -77,14 +77,25 @@ class Device:
             return cls.loads(f.read())
 
     def dumps(self) -> bytes:
-        return self.CURRENT_STRUCT.build(dict(
-            version=self.CURRENT_VERSION,
-            group_key=self.group_key.dumps(),
-            encryption_key=self.encryption_key.dumps(),
-            signing_key=self.signing_key.dumps(),
-            group_certificate_length=len(self.group_certificate.dumps()),
-            group_certificate=self.group_certificate.dumps(),
-        ))
+        try:
+            return self.CURRENT_STRUCT.build(dict(
+                version=self.CURRENT_VERSION,
+                group_key=self.group_key.dumps(),
+                encryption_key=self.encryption_key.dumps(),
+                signing_key=self.signing_key.dumps(),
+                group_certificate_length=len(self.group_certificate.dumps()),
+                group_certificate=self.group_certificate.dumps(),
+            ))
+        except:
+            return DeviceStructs.v2.build(dict(
+                version=2,
+                group_certificate_length=len(self.group_certificate.dumps()),
+                group_certificate=self.group_certificate.dumps(),
+                encryption_key=self.encryption_key.dumps(),
+                signing_key=self.signing_key.dumps()
+            ))
+    def to_b64(self) -> str:
+        return base64.b64encode(self.dumps()).decode("utf-8")
 
     def dump(self, path: Union[Path, str]) -> None:
         if not isinstance(path, (Path, str)):
