@@ -94,6 +94,8 @@ class Device:
                 encryption_key=self.encryption_key.dumps(),
                 signing_key=self.signing_key.dumps()
             ))
+    def to_b64(self) -> str:
+        return base64.b64encode(self.dumps()).decode("utf-8")
 
     def dump(self, path: Union[Path, str]) -> None:
         if not isinstance(path, (Path, str)):
