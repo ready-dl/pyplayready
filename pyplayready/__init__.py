@@ -11,4 +11,4 @@ from pyplayready.system.pssh import *
 from pyplayready.system.session import *
 
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"

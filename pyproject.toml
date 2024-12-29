@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "pyplayready"
-version = "0.4.4"
+version = "0.4.5"
 description = "pyplayready CDM (Content Decryption Module) implementation in Python."
 license = "CC BY-NC-ND 4.0"
 authors = ["DevLARLEY, Erevoc", "DevataDev"]
