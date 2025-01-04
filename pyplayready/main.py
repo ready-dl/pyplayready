@@ -7,7 +7,7 @@ import click
 import requests
 from Crypto.Random import get_random_bytes
 
-from pyplayready import __version__
+from pyplayready import __version__, InvalidCertificateChain
 from pyplayready.system.bcert import CertificateChain, Certificate
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
@@ -56,7 +56,7 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
     session_id = cdm.open()
     log.info("Opened Session")
 
-    challenge = cdm.get_license_challenge(session_id, pssh.get_wrm_headers(downgrade_to_v4=True)[0])
+    challenge = cdm.get_license_challenge(session_id, pssh.get_wrm_headers()[0])
     log.info("Created License Request (Challenge)")
     log.debug(challenge)
 
@@ -69,7 +69,7 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
     )
 
     if license_res.status_code != 200:
-        log.error(f"Failed to send challenge: [{license_res.status_code}] {license_res.text}")
+        log.error(f"Failed to send challenge [{license_res.status_code}]: {license_res.text}")
         return
 
     licence = license_res.text
@@ -88,8 +88,10 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
 
 @main.command()
 @click.argument("device", type=Path)
+@click.option("-c", "--ckt", type=click.Choice(["aesctr", "aescbc"], case_sensitive=False), default="aesctr", help="Content Key Encryption Type")
+@click.option("-sl", "--security_level", type=click.Choice(["150", "2000", "3000"], case_sensitive=False), default="2000", help="Minimum Security Level")
 @click.pass_context
-def test(ctx: click.Context, device: Path) -> None:
+def test(ctx: click.Context, device: Path, ckt: str, security_level: str) -> None:
     """
     Test the CDM code by getting Content Keys for the Tears Of Steel demo on the Playready Test Server.
     https://testweb.playready.microsoft.com/Content/Content2X
@@ -113,7 +115,7 @@ def test(ctx: click.Context, device: Path) -> None:
         "AFQATwBNAEEAVABUAFIASQBCAFUAVABFAFMAPgA8AC8ARABBAFQAQQA+ADwALwBXAFIATQBIAEUAQQBEAEUAUgA+AA=="
     )
 
-    license_server = "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:2000)"
+    license_server = f"https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:{security_level},ckt:{ckt})"
 
     ctx.invoke(
         license_,
@@ -148,6 +150,9 @@ def create_device(
     group_key = ECCKey.load(group_key)
     certificate_chain = CertificateChain.load(group_certificate)
 
+    if certificate_chain.get(0).get_issuer_key() != group_key.public_bytes():
+        raise InvalidCertificateChain("Group key does not match this certificate")
+
     new_certificate = Certificate.new_leaf_cert(
         cert_id=get_random_bytes(16),
         security_level=certificate_chain.get_security_level(),
@@ -158,6 +163,8 @@ def create_device(
         parent=certificate_chain
     )
     certificate_chain.prepend(new_certificate)
+
+    certificate_chain.verify()
 
     device = Device(
         group_key=group_key.dumps(),

@@ -55,8 +55,7 @@ pssh = PSSH(
     "AFQATwBNAEEAVABUAFIASQBCAFUAVABFAFMAPgA8AC8ARABBAFQAQQA+ADwALwBXAFIATQBIAEUAQQBEAEUAUgA+AA=="
 )
 
-# set to `True` if your device doesn't support scalable licenses (this projects also doesn't yet) to downgrade the WRMHEADERs to v4.0.0.0
-wrm_headers = pssh.get_wrm_headers(downgrade_to_v4=False)
+wrm_headers = pssh.get_wrm_headers()
 request = cdm.get_license_challenge(session_id, wrm_headers[0])
 
 response = requests.post(

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 from typing import Union
 
+from Crypto.Cipher import AES
+from Crypto.Hash import CMAC
 from construct import Const, GreedyRange, Struct, Int32ub, Bytes, Int16ub, this, Switch, LazyBound, Array, Container
 
 
@@ -98,7 +99,7 @@ class _XMRLicenseStructs:
 
     PolicyMetadataObject = Struct(
         "metadata_type" / Bytes(16),
-        "policy_data" / Bytes(this._.length)
+        "policy_data" / Bytes(this._.length - 24)
     )
 
     SecureStopRestrictionObject = Struct(
@@ -223,13 +224,6 @@ class XMRLicense(_XMRLicenseStructs):
             license_obj=licence
         )
 
-    @classmethod
-    def load(cls, path: Union[Path, str]) -> XMRLicense:
-        if not isinstance(path, (Path, str)):
-            raise ValueError(f"Expecting Path object or path string, got {path!r}")
-        with Path(path).open(mode="rb") as f:
-            return cls.loads(f.read())
-
     def dumps(self) -> bytes:
         return self._license_obj.build(self.parsed)
 
@@ -250,3 +244,11 @@ class XMRLicense(_XMRLicenseStructs):
 
     def get_content_keys(self):
         yield from self.get_object(10)
+
+    def check_signature(self, integrity_key: bytes) -> bool:
+        cmac = CMAC.new(integrity_key, ciphermod=AES)
+
+        signature_data = next(self.get_object(11))
+        cmac.update(self.dumps()[:-(signature_data.signature_data_length + 12)])
+
+        return signature_data.signature_data == cmac.digest()

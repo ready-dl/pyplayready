@@ -63,14 +63,6 @@ class WRMHeader:
             return [element]
         return element
 
-    def to_v4_0_0_0(self) -> str:
-        """
-        Build a v4.0.0.0 WRM header from any possible WRM Header version
-
-        Note: Will ignore any remaining Key IDs if there's more than just one
-        """
-        return self._build_v4_0_0_0_wrm_header(*self.read_attributes())
-
     @staticmethod
     def _read_v4_0_0_0(data: dict) -> _RETURN_STRUCTURE:
         protect_info = data.get("PROTECTINFO")
@@ -156,7 +148,6 @@ class WRMHeader:
 
         Returns a tuple structured like this: Tuple[List[SignedKeyID], <LA_URL>, <LUI_URL>, <DS_ID>]
         """
-
         data = self._header.get("DATA")
         if not data:
             raise ValueError("Not a valid PlayReady Header Record, WRMHEADER/DATA required")
@@ -169,33 +160,6 @@ class WRMHeader:
             return self._read_v4_2_0_0(data)
         elif self.version == self.Version.VERSION_4_3_0_0:
             return self._read_v4_3_0_0(data)
-
-    @staticmethod
-    def _build_v4_0_0_0_wrm_header(
-            key_ids: List[SignedKeyID],
-            la_url: Optional[str],
-            lui_url: Optional[str],
-            ds_id: Optional[str]
-    ) -> str:
-        if len(key_ids) == 0:
-            raise Exception("No Key IDs available")
-
-        key_id = key_ids[0]
-        return (
-            '<WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0">'
-                '<DATA>'
-                    '<PROTECTINFO>'
-                        '<KEYLEN>16</KEYLEN>'
-                        '<ALGID>AESCTR</ALGID>'
-                    '</PROTECTINFO>'
-                    f'<KID>{key_id.value}</KID>' +
-                    (f'<LA_URL>{la_url}</LA_URL>' if la_url else '') +
-                    (f'<LUI_URL>{lui_url}</LUI_URL>' if lui_url else '') +
-                    (f'<DS_ID>{ds_id}</DS_ID>' if ds_id else '') +
-                    (f'<CHECKSUM>{key_id.checksum}</CHECKSUM>' if key_id.checksum else '') +
-                '</DATA>'
-            '</WRMHEADER>'
-        )
 
     def dumps(self) -> str:
         return self._raw_data.decode("utf-16-le")

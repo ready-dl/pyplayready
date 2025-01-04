@@ -26,8 +26,12 @@ class InvalidLicense(PyPlayreadyException):
     """Unable to parse XMR License."""
 
 
-class InvalidCertificateChain(PyPlayreadyException):
+class InvalidCertificate(PyPlayreadyException):
     """The BCert is not correctly formatted."""
+
+
+class InvalidCertificateChain(PyPlayreadyException):
+    """The BCertChain is not correctly formatted."""
 
 
 class OutdatedDevice(PyPlayreadyException):

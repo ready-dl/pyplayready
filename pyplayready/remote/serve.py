@@ -136,7 +136,7 @@ async def get_license_challenge(request: web.Request) -> web.Response:
     if not init_data.startswith("<WRMHEADER"):
         try:
             pssh = PSSH(init_data)
-            wrm_headers = pssh.get_wrm_headers(downgrade_to_v4=True)
+            wrm_headers = pssh.get_wrm_headers()
             if wrm_headers:
                 init_data = wrm_headers[0]
         except InvalidPssh as e:

@@ -18,7 +18,6 @@ from pyplayready.crypto import Crypto
 from pyplayready.system.bcert import CertificateChain
 from pyplayready.crypto.ecc_key import ECCKey
 from pyplayready.license.key import Key
-from pyplayready.license.xml_key import XmlKey
 from pyplayready.license.xmrlicense import XMRLicense
 from pyplayready.exceptions import (InvalidSession, TooManySessions, InvalidLicense)
 from pyplayready.system.session import Session
@@ -49,6 +48,7 @@ class Cdm:
             y=0x982b27b5cb2341326e56aa857dbfd5c634ce2cf9ea74fca8f2af5957efeea562,
             curve=Curve.get_curve("secp256r1")
         )
+        self._rgbMagicConstantZero = bytes([0x7e, 0xe9, 0xed, 0x4a, 0xf7, 0x73, 0x22, 0x4f, 0x00, 0xb8, 0xea, 0x7e, 0xfb, 0x02, 0x7c, 0xbb])
 
         self.__sessions: dict[bytes, Session] = {}
 
@@ -74,7 +74,6 @@ class Cdm:
 
         session = Session(len(self.__sessions) + 1)
         self.__sessions[session.id] = session
-        session.xml_key = XmlKey()
 
         return session.id
 
@@ -101,7 +100,17 @@ class Cdm:
 
     def _get_cipher_data(self, session: Session) -> bytes:
         b64_chain = base64.b64encode(self.certificate_chain.dumps()).decode()
-        body = f"<Data><CertificateChains><CertificateChain>{b64_chain}</CertificateChain></CertificateChains></Data>"
+        body = (
+            "<Data>"
+                f"<CertificateChains><CertificateChain>{b64_chain}</CertificateChain></CertificateChains>"
+                "<Features>"
+                    '<Feature Name="AESCBC">""</Feature>'
+                    "<REE>"
+                        "<AESCBCS></AESCBCS>"
+                    "</REE>"
+                "</Features>"
+            "</Data>"
+        )
 
         cipher = AES.new(
             key=session.xml_key.aes_key,
@@ -242,21 +251,52 @@ class Cdm:
                 if not self._verify_encryption_key(session, parsed_licence):
                     raise InvalidLicense("Public encryption key does not match")
 
+                is_scalable = bool(next(parsed_licence.get_object(81), None))
+
                 for content_key in parsed_licence.get_content_keys():
-                    if Key.CipherType(content_key.cipher_type) == Key.CipherType.ECC_256:
-                        key = self.__crypto.ecc256_decrypt(
-                            private_key=session.encryption_key,
-                            ciphertext=content_key.encrypted_key
-                        )[16:32]
-                    else:
-                        continue
+                    cipher_type = Key.CipherType(content_key.cipher_type)
+
+                    if not cipher_type in (Key.CipherType.ECC_256, Key.CipherType.ECC_256_WITH_KZ, Key.CipherType.ECC_256_VIA_SYMMETRIC):
+                        raise InvalidLicense(f"Invalid cipher type {cipher_type}")
+
+                    via_symmetric = Key.CipherType(content_key.cipher_type) == Key.CipherType.ECC_256_VIA_SYMMETRIC
+
+                    decrypted = self.__crypto.ecc256_decrypt(
+                        private_key=session.encryption_key,
+                        ciphertext=content_key.encrypted_key
+                    )
+                    ci, ck = decrypted[:16], decrypted[16:32]
+
+                    if is_scalable:
+                        ci, ck = decrypted[::2][:16], decrypted[1::2][:16]
+
+                        if via_symmetric:
+                            embedded_root_license = content_key.encrypted_key[:144]
+                            embedded_leaf_license = content_key.encrypted_key[144:]
+
+                            rgb_key = bytes(ck[i] ^ self._rgbMagicConstantZero[i] for i in range(16))
+                            content_key_prime = AES.new(ck, AES.MODE_ECB).encrypt(rgb_key)
+
+                            aux_key = next(parsed_licence.get_object(81))["auxiliary_keys"][0]["key"]
+                            derived_aux_key = AES.new(content_key_prime, AES.MODE_ECB).encrypt(aux_key)
+
+                            uplink_x_key = bytes(bytearray(16)[i] ^ derived_aux_key[i] for i in range(16))
+                            secondary_key = AES.new(ck, AES.MODE_ECB).encrypt(embedded_root_license[128:])
+
+                            embedded_leaf_license = AES.new(uplink_x_key, AES.MODE_ECB).encrypt(embedded_leaf_license)
+                            embedded_leaf_license = AES.new(secondary_key, AES.MODE_ECB).encrypt(embedded_leaf_license)
+
+                            ci, ck = embedded_leaf_license[:16], embedded_leaf_license[16:]
+
+                    if not parsed_licence.check_signature(ci):
+                        raise InvalidLicense("License integrity signature does not match")
 
                     session.keys.append(Key(
                         key_id=UUID(bytes_le=content_key.key_id),
                         key_type=content_key.key_type,
                         cipher_type=content_key.cipher_type,
                         key_length=content_key.key_length,
-                        key=key
+                        key=ck
                     ))
         except InvalidLicense as e:
             raise InvalidLicense(e)

@@ -3,16 +3,16 @@ from __future__ import annotations
 import base64
 from enum import IntEnum
 from pathlib import Path
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 from pyplayready.device.structs import DeviceStructs
+from pyplayready.exceptions import OutdatedDevice
 from pyplayready.system.bcert import CertificateChain
 from pyplayready.crypto.ecc_key import ECCKey
 
 
 class Device:
     """Represents a PlayReady Device (.prd)"""
-    CURRENT_STRUCT = DeviceStructs.v3
     CURRENT_VERSION = 3
 
     class SecurityLevel(IntEnum):
@@ -23,7 +23,7 @@ class Device:
     def __init__(
             self,
             *_: Any,
-            group_key: Union[str, bytes, None],
+            group_key: Optional[str, bytes, None],
             encryption_key: Union[str, bytes],
             signing_key: Union[str, bytes],
             group_certificate: Union[str, bytes],
@@ -60,14 +60,11 @@ class Device:
         if not isinstance(data, bytes):
             raise ValueError(f"Expecting Bytes or Base64 input, got {data!r}")
 
-        prd_header = DeviceStructs.header.parse(data)
-        if prd_header.version == 2:
-            return cls(
-                group_key=None,
-                **DeviceStructs.v2.parse(data)
-            )
-
-        return cls(**cls.CURRENT_STRUCT.parse(data))
+        parsed = DeviceStructs.prd.parse(data)
+        return cls(**{
+            **parsed,
+            'group_key': parsed.get('group_key', None)
+        })
 
     @classmethod
     def load(cls, path: Union[Path, str]) -> Device:
@@ -77,7 +74,10 @@ class Device:
             return cls.loads(f.read())
 
     def dumps(self) -> bytes:
-        return self.CURRENT_STRUCT.build(dict(
+        if not self.group_key:
+            raise OutdatedDevice("Cannot dump a v2 device, re-create it or use a Device with a version of 3 or higher")
+
+        return DeviceStructs.prd.build(dict(
             version=self.CURRENT_VERSION,
             group_key=self.group_key.dumps(),
             encryption_key=self.encryption_key.dumps(),
