@@ -34,10 +34,7 @@ async def _cleanup(app: web.Application) -> None:
 
 @routes.get("/")
 async def ping(_: Any) -> web.Response:
-    return web.json_response({
-        "status": 200,
-        "message": "Pong!"
-    })
+    return web.json_response({"message": "OK"})
 
 
 @routes.get("/{device}/open")
@@ -49,10 +46,7 @@ async def open_(request: web.Request) -> web.Response:
     if device_name not in user["devices"] or device_name not in request.app["config"]["devices"]:
         # we don't want to be verbose with the error as to not reveal device names
         # by trial and error to users that are not authorized to use them
-        return web.json_response({
-            "status": 403,
-            "message": f"Device '{device_name}' is not found or you are not authorized to use it."
-        }, status=403)
+        return web.json_response({"message": f"Device '{device_name}' is not found or you are not authorized to use it."}, status=403)
 
     cdm: Optional[Cdm] = request.app["cdms"].get((secret_key, device_name))
     if not cdm:
@@ -62,13 +56,9 @@ async def open_(request: web.Request) -> web.Response:
     try:
         session_id = cdm.open()
     except TooManySessions as e:
-        return web.json_response({
-            "status": 400,
-            "message": str(e)
-        }, status=400)
+        return web.json_response({"message": str(e)}, status=400)
 
     return web.json_response({
-        "status": 200,
         "message": "Success",
         "data": {
             "session_id": session_id.hex(),
@@ -87,23 +77,14 @@ async def close(request: web.Request) -> web.Response:
 
     cdm: Optional[Cdm] = request.app["cdms"].get((secret_key, device_name))
     if not cdm:
-        return web.json_response({
-            "status": 400,
-            "message": f"No Cdm session for {device_name} has been opened yet. No session to close."
-        }, status=400)
+        return web.json_response({"message": f"No Cdm session for {device_name} has been opened yet. No session to close."}, status=400)
 
     try:
         cdm.close(session_id)
     except InvalidSession:
-        return web.json_response({
-            "status": 400,
-            "message": f"Invalid Session ID '{session_id.hex()}', it may have expired."
-        }, status=400)
+        return web.json_response({"message": f"Invalid Session ID '{session_id.hex()}', it may have expired."}, status=400)
 
-    return web.json_response({
-        "status": 200,
-        "message": f"Successfully closed Session '{session_id.hex()}'."
-    })
+    return web.json_response({"message": f"Successfully closed Session '{session_id.hex()}'."})
 
 
 @routes.post("/{device}/get_license_challenge")
@@ -112,58 +93,36 @@ async def get_license_challenge(request: web.Request) -> web.Response:
     device_name = request.match_info["device"]
 
     body = await request.json()
-    for required_field in ("session_id", "init_data"):
+    for required_field in ("init_data", "session_id"):
         if not body.get(required_field):
-            return web.json_response({
-                "status": 400,
-                "message": f"Missing required field '{required_field}' in JSON body."
-            }, status=400)
+            return web.json_response({"message": f"Missing required field '{required_field}' in JSON body."}, status=400)
 
-    # get session id
-    session_id = bytes.fromhex(body["session_id"])
-
-    # get cdm
     cdm: Optional[Cdm] = request.app["cdms"].get((secret_key, device_name))
     if not cdm:
-        return web.json_response({
-            "status": 400,
-            "message": f"No Cdm session for {device_name} has been opened yet. No session to use."
-        }, status=400)
+        return web.json_response({"message": f"No Cdm session for {device_name} has been opened yet. No session to use."}, status=400)
 
-    # get init data
+    session_id = bytes.fromhex(body["session_id"])
     init_data = body["init_data"]
 
     if not init_data.startswith("<WRMHEADER"):
         try:
             pssh = PSSH(init_data)
-            wrm_headers = pssh.get_wrm_headers()
-            if wrm_headers:
-                init_data = wrm_headers[0]
+            if pssh.wrm_headers:
+                init_data = pssh.wrm_headers[0]
         except InvalidPssh as e:
-            return web.json_response({
-                "status": 500,
-                "message": f"Unable to parse base64 PSSH, {e}"
-            }, status=500)
+            return web.json_response({"message": f"Unable to parse base64 PSSH, {e}"}, status=500)
 
-    # get challenge
     try:
         license_request = cdm.get_license_challenge(
             session_id=session_id,
             wrm_header=init_data,
         )
     except InvalidSession:
-        return web.json_response({
-            "status": 400,
-            "message": f"Invalid Session ID '{session_id.hex()}', it may have expired."
-        }, status=400)
+        return web.json_response({"message": f"Invalid Session ID '{session_id.hex()}', it may have expired."}, status=400)
     except Exception as e:
-        return web.json_response({
-            "status": 500,
-            "message": f"Error, {e}"
-        }, status=500)
+        return web.json_response({"message": f"Error, {e}"}, status=500)
 
     return web.json_response({
-        "status": 200,
         "message": "Success",
         "data": {
             "challenge": license_request
@@ -177,47 +136,27 @@ async def parse_license(request: web.Request) -> web.Response:
     device_name = request.match_info["device"]
 
     body = await request.json()
-    for required_field in ("session_id", "license_message"):
+    for required_field in ("license_message", "session_id"):
         if not body.get(required_field):
-            return web.json_response({
-                "status": 400,
-                "message": f"Missing required field '{required_field}' in JSON body."
-            }, status=400)
+            return web.json_response({"message": f"Missing required field '{required_field}' in JSON body."}, status=400)
 
-    # get session id
-    session_id = bytes.fromhex(body["session_id"])
-
-    # get cdm
     cdm: Optional[Cdm] = request.app["cdms"].get((secret_key, device_name))
     if not cdm:
-        return web.json_response({
-            "status": 400,
-            "message": f"No Cdm session for {device_name} has been opened yet. No session to use."
-        }, status=400)
+        return web.json_response({"message": f"No Cdm session for {device_name} has been opened yet. No session to use."}, status=400)
 
-    # parse the license message
+    session_id = bytes.fromhex(body["session_id"])
+    license_message = body["license_message"]
+
     try:
-        cdm.parse_license(session_id, body["license_message"])
+        cdm.parse_license(session_id, license_message)
     except InvalidSession:
-        return web.json_response({
-            "status": 400,
-            "message": f"Invalid Session ID '{session_id.hex()}', it may have expired."
-        }, status=400)
+        return web.json_response({"message": f"Invalid Session ID '{session_id.hex()}', it may have expired."}, status=400)
     except InvalidLicense as e:
-        return web.json_response({
-            "status": 400,
-            "message": f"Invalid License, {e}"
-        }, status=400)
+        return web.json_response({"message": f"Invalid License, {e}"}, status=400)
     except Exception as e:
-        return web.json_response({
-            "status": 500,
-            "message": f"Error, {e}"
-        }, status=500)
+        return web.json_response({"message": f"Error, {e}"}, status=500)
 
-    return web.json_response({
-        "status": 200,
-        "message": "Successfully parsed and loaded the Keys from the License message."
-    })
+    return web.json_response({"message": "Successfully parsed and loaded the Keys from the License message."})
 
 
 @routes.post("/{device}/get_keys")
@@ -228,37 +167,21 @@ async def get_keys(request: web.Request) -> web.Response:
     body = await request.json()
     for required_field in ("session_id",):
         if not body.get(required_field):
-            return web.json_response({
-                "status": 400,
-                "message": f"Missing required field '{required_field}' in JSON body."
-            }, status=400)
+            return web.json_response({"message": f"Missing required field '{required_field}' in JSON body."}, status=400)
 
-    # get session id
     session_id = bytes.fromhex(body["session_id"])
 
-    # get cdm
     cdm = request.app["cdms"].get((secret_key, device_name))
     if not cdm:
-        return web.json_response({
-            "status": 400,
-            "message": f"No Cdm session for {device_name} has been opened yet. No session to use."
-        }, status=400)
+        return web.json_response({"message": f"No Cdm session for {device_name} has been opened yet. No session to use."}, status=400)
 
-    # get keys
     try:
         keys = cdm.get_keys(session_id)
     except InvalidSession:
-        return web.json_response({
-            "status": 400,
-            "message": f"Invalid Session ID '{session_id.hex()}', it may have expired."
-        }, status=400)
+        return web.json_response({"message": f"Invalid Session ID '{session_id.hex()}', it may have expired."}, status=400)
     except Exception as e:
-        return web.json_response({
-            "status": 500,
-            "message": f"Error, {e}"
-        }, status=500)
+        return web.json_response({"message": f"Error, {e}"}, status=500)
 
-    # get the keys in json form
     keys_json = [
         {
             "key_id": key.key_id.hex,
@@ -271,7 +194,6 @@ async def get_keys(request: web.Request) -> web.Response:
     ]
 
     return web.json_response({
-        "status": 200,
         "message": "Success",
         "data": {
             "keys": keys_json
@@ -285,25 +207,16 @@ async def authentication(request: web.Request, handler: Handler) -> web.Response
 
     if request.path != "/" and not secret_key:
         request.app.logger.debug(f"{request.remote} did not provide authorization.")
-        response = web.json_response({
-            "status": "401",
-            "message": "Secret Key is Empty."
-        }, status=401)
+        response = web.json_response({"message": "Secret Key is Empty."}, status=401)
     elif request.path != "/" and secret_key not in request.app["config"]["users"]:
         request.app.logger.debug(f"{request.remote} failed authentication with '{secret_key}'.")
-        response = web.json_response({
-            "status": "401",
-            "message": "Secret Key is Invalid, the Key is case-sensitive."
-        }, status=401)
+        response = web.json_response({"message": "Secret Key is Invalid, the Key is case-sensitive."}, status=401)
     else:
         try:
-            response = await handler(request)  # type: ignore[assignment]
+            response = await handler(request)
         except web.HTTPException as e:
             request.app.logger.error(f"An unexpected error has occurred, {e}")
-            response = web.json_response({
-                "status": 500,
-                "message": e.reason
-            }, status=500)
+            response = web.json_response({"message": e.reason}, status=500)
 
     response.headers.update({
         "Server": f"https://github.com/ready-dl/pyplayready serve v{__version__}"

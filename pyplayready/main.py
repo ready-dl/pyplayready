@@ -7,7 +7,7 @@ import click
 import requests
 from Crypto.Random import get_random_bytes
 
-from pyplayready import __version__, InvalidCertificateChain
+from pyplayready import __version__, InvalidCertificateChain, InvalidLicense
 from pyplayready.system.bcert import CertificateChain, Certificate
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
@@ -56,11 +56,11 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
     session_id = cdm.open()
     log.info("Opened Session")
 
-    challenge = cdm.get_license_challenge(session_id, pssh.get_wrm_headers()[0])
+    challenge = cdm.get_license_challenge(session_id, pssh.wrm_headers[0])
     log.info("Created License Request (Challenge)")
     log.debug(challenge)
 
-    license_res = requests.post(
+    license_response = requests.post(
         url=server,
         headers={
             'Content-Type': 'text/xml; charset=UTF-8',
@@ -68,15 +68,15 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
         data=challenge
     )
 
-    if license_res.status_code != 200:
-        log.error(f"Failed to send challenge [{license_res.status_code}]: {license_res.text}")
-        return
-
-    licence = license_res.text
-    log.info("Got License Message")
+    licence = license_response.text
     log.debug(licence)
 
-    cdm.parse_license(session_id, licence)
+    try:
+        cdm.parse_license(session_id, licence)
+    except InvalidLicense as e:
+        log.error(e)
+        return
+
     log.info("License Parsed Successfully")
 
     for key in cdm.get_keys(session_id):
@@ -89,7 +89,7 @@ def license_(device_path: Path, pssh: PSSH, server: str) -> None:
 @main.command()
 @click.argument("device", type=Path)
 @click.option("-c", "--ckt", type=click.Choice(["aesctr", "aescbc"], case_sensitive=False), default="aesctr", help="Content Key Encryption Type")
-@click.option("-sl", "--security_level", type=click.Choice(["150", "2000", "3000"], case_sensitive=False), default="2000", help="Minimum Security Level")
+@click.option("-sl", "--security_level", type=click.Choice(["150", "2000", "3000"]), default="2000", help="Minimum Security Level")
 @click.pass_context
 def test(ctx: click.Context, device: Path, ckt: str, security_level: str) -> None:
     """
@@ -127,12 +127,16 @@ def test(ctx: click.Context, device: Path, ckt: str, security_level: str) -> Non
 
 @main.command()
 @click.option("-k", "--group_key", type=Path, required=True, help="Device ECC private group key")
+@click.option("-e", "--encryption_key", type=Path, required=False, help="Optional Device ECC private encryption key")
+@click.option("-s", "--signing_key", type=Path, required=False, help="Optional Device ECC private signing key")
 @click.option("-c", "--group_certificate", type=Path, required=True, help="Device group certificate chain")
 @click.option("-o", "--output", type=Path, default=None, help="Output Path or Directory")
 @click.pass_context
 def create_device(
     ctx: click.Context,
     group_key: Path,
+    encryption_key: Optional[Path],
+    signing_key: Optional[Path],
     group_certificate: Path,
     output: Optional[Path] = None
 ) -> None:
@@ -144,8 +148,8 @@ def create_device(
 
     log = logging.getLogger("create-device")
 
-    encryption_key = ECCKey.generate()
-    signing_key = ECCKey.generate()
+    encryption_key = ECCKey.load(encryption_key) if encryption_key else ECCKey.generate()
+    signing_key = ECCKey.load(signing_key) if signing_key else ECCKey.generate()
 
     group_key = ECCKey.load(group_key)
     certificate_chain = CertificateChain.load(group_certificate)
@@ -199,9 +203,17 @@ def create_device(
 
 @main.command()
 @click.argument("prd_path", type=Path)
+@click.option("-e", "--encryption_key", type=Path, required=False, help="Optional Device ECC private encryption key")
+@click.option("-s", "--signing_key", type=Path, required=False, help="Optional Device ECC private signing key")
 @click.option("-o", "--output", type=Path, default=None, help="Output Path or Directory")
 @click.pass_context
-def reprovision_device(ctx: click.Context, prd_path: Path, output: Optional[Path] = None) -> None:
+def reprovision_device(
+    ctx: click.Context,
+    prd_path: Path,
+    encryption_key: Optional[Path],
+    signing_key: Optional[Path],
+    output: Optional[Path] = None
+) -> None:
     """
     Reprovision a Playready Device (.prd) by creating a new leaf certificate and new encryption/signing keys.
     Will override the device if an output path or directory is not specified
@@ -221,8 +233,8 @@ def reprovision_device(ctx: click.Context, prd_path: Path, output: Optional[Path
 
     device.group_certificate.remove(0)
 
-    encryption_key = ECCKey.generate()
-    signing_key = ECCKey.generate()
+    encryption_key = ECCKey.load(encryption_key) if encryption_key else ECCKey.generate()
+    signing_key = ECCKey.load(signing_key) if signing_key else ECCKey.generate()
 
     device.encryption_key = encryption_key
     device.signing_key = signing_key
@@ -299,7 +311,7 @@ def export_device(ctx: click.Context, prd_path: Path, out_dir: Optional[Path] = 
     log.info("Exported Group Certificate to bgroupcert.dat")
 
 
-@main.command("serve", short_help="Serve your local CDM and Playready Devices Remotely.")
+@main.command("serve", short_help="Serve your local CDM and Playready Devices remotely.")
 @click.argument("config_path", type=Path)
 @click.option("-h", "--host", type=str, default="127.0.0.1", help="Host to serve from.")
 @click.option("-p", "--port", type=int, default=7723, help="Port to serve from.")

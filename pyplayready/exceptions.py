@@ -36,3 +36,7 @@ class InvalidCertificateChain(PyPlayreadyException):
 
 class OutdatedDevice(PyPlayreadyException):
     """The PlayReady Device is outdated and does not support a specific operation."""
+
+
+class ServerException(PyPlayreadyException):
+    """Recasted on the client if found in license response."""

@@ -1,28 +1,131 @@
 from __future__ import annotations
 import collections.abc
 
-from Crypto.PublicKey import ECC
-
-from pyplayready.crypto import Crypto
-from pyplayready.exceptions import InvalidCertificateChain, InvalidCertificate
-
 # monkey patch for construct 2.8.8 compatibility
 if not hasattr(collections, 'Sequence'):
     collections.Sequence = collections.abc.Sequence
 
 import base64
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
+from enum import IntEnum
+
+from Crypto.PublicKey import ECC
 
 from construct import Bytes, Const, Int32ub, GreedyRange, Switch, Container, ListContainer
 from construct import Int16ub, Array
 from construct import Struct, this
 
+from pyplayready.crypto import Crypto
+from pyplayready.exceptions import InvalidCertificateChain, InvalidCertificate
 from pyplayready.crypto.ecc_key import ECCKey
 
 
+class BCertCertType(IntEnum):
+    UNKNOWN = 0x00000000
+    PC = 0x00000001
+    DEVICE = 0x00000002
+    DOMAIN = 0x00000003
+    ISSUER = 0x00000004
+    CRL_SIGNER = 0x00000005
+    SERVICE = 0x00000006
+    SILVERLIGHT = 0x00000007
+    APPLICATION = 0x00000008
+    METERING = 0x00000009
+    KEYFILESIGNER = 0x0000000a
+    SERVER = 0x0000000b
+    LICENSESIGNER = 0x0000000c
+    SECURETIMESERVER = 0x0000000d
+    RPROVMODELAUTH = 0x0000000e
+
+
+class BCertObjType(IntEnum):
+    BASIC = 0x0001
+    DOMAIN = 0x0002
+    PC = 0x0003
+    DEVICE = 0x0004
+    FEATURE = 0x0005
+    KEY = 0x0006
+    MANUFACTURER = 0x0007
+    SIGNATURE = 0x0008
+    SILVERLIGHT = 0x0009
+    METERING = 0x000A
+    EXTDATASIGNKEY = 0x000B
+    EXTDATACONTAINER = 0x000C
+    EXTDATASIGNATURE = 0x000D
+    EXTDATA_HWID = 0x000E
+    SERVER = 0x000F
+    SECURITY_VERSION = 0x0010
+    SECURITY_VERSION_2 = 0x0011
+    UNKNOWN_OBJECT_ID = 0xFFFD
+
+
+class BCertFlag(IntEnum):
+    EMPTY = 0x00000000
+    EXTDATA_PRESENT = 0x00000001
+
+
+class BCertObjFlag(IntEnum):
+    EMPTY = 0x0000
+    MUST_UNDERSTAND = 0x0001
+    CONTAINER_OBJ = 0x0002
+
+
+class BCertSignatureType(IntEnum):
+    P256 = 0x0001
+
+
+class BCertKeyType(IntEnum):
+    ECC256 = 0x0001
+
+
+class BCertKeyUsage(IntEnum):
+    UNKNOWN = 0x00000000
+    SIGN = 0x00000001
+    ENCRYPT_KEY = 0x00000002
+    SIGN_CRL = 0x00000003
+    ISSUER_ALL = 0x00000004
+    ISSUER_INDIV = 0x00000005
+    ISSUER_DEVICE = 0x00000006
+    ISSUER_LINK = 0x00000007
+    ISSUER_DOMAIN = 0x00000008
+    ISSUER_SILVERLIGHT = 0x00000009
+    ISSUER_APPLICATION = 0x0000000a
+    ISSUER_CRL = 0x0000000b
+    ISSUER_METERING = 0x0000000c
+    ISSUER_SIGN_KEYFILE = 0x0000000d
+    SIGN_KEYFILE = 0x0000000e
+    ISSUER_SERVER = 0x0000000f
+    ENCRYPTKEY_SAMPLE_PROTECTION_RC4 = 0x00000010
+    RESERVED2 = 0x00000011
+    ISSUER_SIGN_LICENSE = 0x00000012
+    SIGN_LICENSE = 0x00000013
+    SIGN_RESPONSE = 0x00000014
+    PRND_ENCRYPT_KEY_DEPRECATED = 0x00000015
+    ENCRYPTKEY_SAMPLE_PROTECTION_AES128CTR = 0x00000016
+    ISSUER_SECURETIMESERVER = 0x00000017
+    ISSUER_RPROVMODELAUTH = 0x00000018
+
+
+class BCertFeatures(IntEnum):
+    TRANSMITTER = 0x00000001
+    RECEIVER = 0x00000002
+    SHARED_CERTIFICATE = 0x00000003
+    SECURE_CLOCK = 0x00000004
+    ANTIROLLBACK_CLOCK = 0x00000005
+    RESERVED_METERING = 0x00000006
+    RESERVED_LICSYNC = 0x00000007
+    RESERVED_SYMOPT = 0x00000008
+    SUPPORTS_CRLS = 0x00000009
+    SERVER_BASIC_EDITION = 0x0000000A
+    SERVER_STANDARD_EDITION = 0x0000000B
+    SERVER_PREMIUM_EDITION = 0x0000000C
+    SUPPORTS_PR3_FEATURES = 0x0000000D
+    DEPRECATED_SECURE_STOP = 0x0000000E
+
+
 class _BCertStructs:
-    DrmBCertBasicInfo = Struct(
+    BasicInfo = Struct(
         "cert_id" / Bytes(16),
         "security_level" / Int32ub,
         "flags" / Int32ub,
@@ -33,7 +136,7 @@ class _BCertStructs:
     )
 
     # TODO: untested
-    DrmBCertDomainInfo = Struct(
+    DomainInfo = Struct(
         "service_id" / Bytes(16),
         "account_id" / Bytes(16),
         "revision_timestamp" / Int32ub,
@@ -42,23 +145,22 @@ class _BCertStructs:
     )
 
     # TODO: untested
-    DrmBCertPCInfo = Struct(
+    PCInfo = Struct(
         "security_version" / Int32ub
     )
 
-    # TODO: untested
-    DrmBCertDeviceInfo = Struct(
+    DeviceInfo = Struct(
         "max_license" / Int32ub,
         "max_header" / Int32ub,
         "max_chain_depth" / Int32ub
     )
 
-    DrmBCertFeatureInfo = Struct(
+    FeatureInfo = Struct(
         "feature_count" / Int32ub,  # max. 32
         "features" / Array(this.feature_count, Int32ub)
     )
 
-    DrmBCertKeyInfo = Struct(
+    KeyInfo = Struct(
         "key_count" / Int32ub,
         "cert_keys" / Array(this.key_count, Struct(
             "type" / Int16ub,
@@ -70,7 +172,7 @@ class _BCertStructs:
         ))
     )
 
-    DrmBCertManufacturerInfo = Struct(
+    ManufacturerInfo = Struct(
         "flags" / Int32ub,
         "manufacturer_name_length" / Int32ub,
         "manufacturer_name" / Bytes((this.manufacturer_name_length + 3) & 0xfffffffc),
@@ -80,7 +182,7 @@ class _BCertStructs:
         "model_number" / Bytes((this.model_number_length + 3) & 0xfffffffc),
     )
 
-    DrmBCertSignatureInfo = Struct(
+    SignatureInfo = Struct(
         "signature_type" / Int16ub,
         "signature_size" / Int16ub,
         "signature" / Bytes(this.signature_size),
@@ -89,20 +191,19 @@ class _BCertStructs:
     )
 
     # TODO: untested
-    DrmBCertSilverlightInfo = Struct(
+    SilverlightInfo = Struct(
         "security_version" / Int32ub,
         "platform_identifier" / Int32ub
     )
 
     # TODO: untested
-    DrmBCertMeteringInfo = Struct(
+    MeteringInfo = Struct(
         "metering_id" / Bytes(16),
         "metering_url_length" / Int32ub,
         "metering_url" / Bytes((this.metering_url_length + 3) & 0xfffffffc)
     )
 
-    # TODO: untested
-    DrmBCertExtDataSignKeyInfo = Struct(
+    ExtDataSignKeyInfo = Struct(
         "key_type" / Int16ub,
         "key_length" / Int16ub,
         "flags" / Int32ub,
@@ -110,32 +211,30 @@ class _BCertStructs:
     )
 
     # TODO: untested
-    BCertExtDataRecord = Struct(
+    DataRecord = Struct(
         "data_size" / Int32ub,
         "data" / Bytes(this.data_size)
     )
 
-    # TODO: untested
-    DrmBCertExtDataSignature = Struct(
+    ExtDataSignature = Struct(
         "signature_type" / Int16ub,
         "signature_size" / Int16ub,
         "signature" / Bytes(this.signature_size)
     )
 
-    # TODO: untested
-    BCertExtDataContainer = Struct(
+    ExtDataContainer = Struct(
         "record_count" / Int32ub,  # always 1
-        "records" / Array(this.record_count, BCertExtDataRecord),
-        "signature" / DrmBCertExtDataSignature
+        "records" / Array(this.record_count, DataRecord),
+        "signature" / ExtDataSignature
     )
 
     # TODO: untested
-    DrmBCertServerInfo = Struct(
+    ServerInfo = Struct(
         "warning_days" / Int32ub
     )
 
     # TODO: untested
-    DrmBcertSecurityVersion = Struct(
+    SecurityVersion = Struct(
         "security_version" / Int32ub,
         "platform_identifier" / Int32ub
     )
@@ -147,23 +246,23 @@ class _BCertStructs:
         "attribute" / Switch(
             lambda this_: this_.tag,
             {
-                1: DrmBCertBasicInfo,
-                2: DrmBCertDomainInfo,
-                3: DrmBCertPCInfo,
-                4: DrmBCertDeviceInfo,
-                5: DrmBCertFeatureInfo,
-                6: DrmBCertKeyInfo,
-                7: DrmBCertManufacturerInfo,
-                8: DrmBCertSignatureInfo,
-                9: DrmBCertSilverlightInfo,
-                10: DrmBCertMeteringInfo,
-                11: DrmBCertExtDataSignKeyInfo,
-                12: BCertExtDataContainer,
-                13: DrmBCertExtDataSignature,
-                14: Bytes(this.length - 8),
-                15: DrmBCertServerInfo,
-                16: DrmBcertSecurityVersion,
-                17: DrmBcertSecurityVersion
+                BCertObjType.BASIC: BasicInfo,
+                BCertObjType.DOMAIN: DomainInfo,
+                BCertObjType.PC: PCInfo,
+                BCertObjType.DEVICE: DeviceInfo,
+                BCertObjType.FEATURE: FeatureInfo,
+                BCertObjType.KEY: KeyInfo,
+                BCertObjType.MANUFACTURER: ManufacturerInfo,
+                BCertObjType.SIGNATURE: SignatureInfo,
+                BCertObjType.SILVERLIGHT: SilverlightInfo,
+                BCertObjType.METERING: MeteringInfo,
+                BCertObjType.EXTDATASIGNKEY: ExtDataSignKeyInfo,
+                BCertObjType.EXTDATACONTAINER: ExtDataContainer,
+                BCertObjType.EXTDATASIGNATURE: ExtDataSignature,
+                BCertObjType.EXTDATA_HWID: Bytes(this.length - 8),
+                BCertObjType.SERVER: ServerInfo,
+                BCertObjType.SECURITY_VERSION: SecurityVersion,
+                BCertObjType.SECURITY_VERSION_2: SecurityVersion
             },
             default=Bytes(this.length - 8)
         )
@@ -213,16 +312,16 @@ class Certificate(_BCertStructs):
         basic_info = Container(
             cert_id=cert_id,
             security_level=security_level,
-            flags=0,
-            cert_type=2,
+            flags=BCertFlag.EMPTY,
+            cert_type=BCertCertType.DEVICE,
             public_key_digest=signing_key.public_sha256_digest(),
             expiration_date=expiry,
             client_id=client_id
         )
         basic_info_attribute = Container(
-            flags=1,
-            tag=1,
-            length=len(_BCertStructs.DrmBCertBasicInfo.build(basic_info)) + 8,
+            flags=BCertObjFlag.MUST_UNDERSTAND,
+            tag=BCertObjType.BASIC,
+            length=len(_BCertStructs.BasicInfo.build(basic_info)) + 8,
             attribute=basic_info
         )
 
@@ -232,58 +331,51 @@ class Certificate(_BCertStructs):
             max_chain_depth=2
         )
         device_info_attribute = Container(
-            flags=1,
-            tag=4,
-            length=len(_BCertStructs.DrmBCertDeviceInfo.build(device_info)) + 8,
+            flags=BCertObjFlag.MUST_UNDERSTAND,
+            tag=BCertObjType.DEVICE,
+            length=len(_BCertStructs.DeviceInfo.build(device_info)) + 8,
             attribute=device_info
         )
 
         feature = Container(
             feature_count=3,
             features=ListContainer([
-                # 1,  # Transmitter
-                # 2,  # Receiver
-                # 3,  # SharedCertificate
-                4,  # SecureClock
-                # 5, # AntiRollBackClock
-                # 6, # ReservedMetering
-                # 7, # ReservedLicSync
-                # 8, # ReservedSymOpt
-                9,  # CRLS (Revocation Lists)
-                # 10, # ServerBasicEdition
-                # 11, # ServerStandardEdition
-                # 12, # ServerPremiumEdition
-                13,  # PlayReady3Features
-                # 14, # DeprecatedSecureStop
+                BCertFeatures.SECURE_CLOCK,
+                BCertFeatures.SUPPORTS_CRLS,
+                BCertFeatures.SUPPORTS_PR3_FEATURES
             ])
         )
         feature_attribute = Container(
-            flags=1,
-            tag=5,
-            length=len(_BCertStructs.DrmBCertFeatureInfo.build(feature)) + 8,
+            flags=BCertObjFlag.MUST_UNDERSTAND,
+            tag=BCertObjType.FEATURE,
+            length=len(_BCertStructs.FeatureInfo.build(feature)) + 8,
             attribute=feature
         )
 
+        signing_key_public_bytes = signing_key.public_bytes()
         cert_key_sign = Container(
-            type=1,
-            length=512,  # bits
-            flags=0,
-            key=signing_key.public_bytes(),
+            type=BCertKeyType.ECC256,
+            length=len(signing_key_public_bytes) * 8,  # bits
+            flags=BCertFlag.EMPTY,
+            key=signing_key_public_bytes,
             usages_count=1,
             usages=ListContainer([
-                1  # KEYUSAGE_SIGN
+                BCertKeyUsage.SIGN
             ])
         )
+
+        encryption_key_public_bytes = encryption_key.public_bytes()
         cert_key_encrypt = Container(
-            type=1,
-            length=512,  # bits
-            flags=0,
-            key=encryption_key.public_bytes(),
+            type=BCertKeyType.ECC256,
+            length=len(encryption_key_public_bytes) * 8,  # bits
+            flags=BCertFlag.EMPTY,
+            key=encryption_key_public_bytes,
             usages_count=1,
             usages=ListContainer([
-                2  # KEYUSAGE_ENCRYPT_KEY
+                BCertKeyUsage.ENCRYPT_KEY
             ])
         )
+
         key_info = Container(
             key_count=2,
             cert_keys=ListContainer([
@@ -292,13 +384,13 @@ class Certificate(_BCertStructs):
             ])
         )
         key_info_attribute = Container(
-            flags=1,
-            tag=6,
-            length=len(_BCertStructs.DrmBCertKeyInfo.build(key_info)) + 8,
+            flags=BCertObjFlag.MUST_UNDERSTAND,
+            tag=BCertObjType.KEY,
+            length=len(_BCertStructs.KeyInfo.build(key_info)) + 8,
             attribute=key_info
         )
 
-        manufacturer_info = parent.get(0).get_attribute(7)
+        manufacturer_info = parent.get(0).get_attribute(BCertObjType.MANUFACTURER)
 
         new_bcert_container = Container(
             signature=b"CERT",
@@ -321,17 +413,19 @@ class Certificate(_BCertStructs):
         sign_payload = _BCertStructs.BCert.build(new_bcert_container)
         signature = Crypto.ecc256_sign(group_key, sign_payload)
 
+        group_key_public_bytes = group_key.public_bytes()
+
         signature_info = Container(
-            signature_type=1,
-            signature_size=64,
+            signature_type=BCertSignatureType.P256,
+            signature_size=len(signature),
             signature=signature,
-            signature_key_size=512,  # bits
-            signature_key=group_key.public_bytes()
+            signature_key_size=len(group_key_public_bytes) * 8,  # bits
+            signature_key=group_key_public_bytes
         )
         signature_info_attribute = Container(
-            flags=1,
-            tag=8,
-            length=len(_BCertStructs.DrmBCertSignatureInfo.build(signature_info)) + 8,
+            flags=BCertObjFlag.MUST_UNDERSTAND,
+            tag=BCertObjType.SIGNATURE,
+            length=len(_BCertStructs.SignatureInfo.build(signature_info)) + 8,
             attribute=signature_info
         )
         new_bcert_container.attributes.append(signature_info_attribute)
@@ -357,7 +451,7 @@ class Certificate(_BCertStructs):
                 return attribute
 
     def get_security_level(self) -> int:
-        basic_info_attribute = self.get_attribute(1).attribute
+        basic_info_attribute = self.get_attribute(BCertObjType.BASIC).attribute
         if basic_info_attribute:
             return basic_info_attribute.security_level
 
@@ -366,12 +460,12 @@ class Certificate(_BCertStructs):
         return name.rstrip(b'\x00').decode("utf-8", errors="ignore")
 
     def get_name(self):
-        manufacturer_info = self.get_attribute(7).attribute
+        manufacturer_info = self.get_attribute(BCertObjType.MANUFACTURER).attribute
         if manufacturer_info:
             return f"{self._unpad(manufacturer_info.manufacturer_name)} {self._unpad(manufacturer_info.model_name)} {self._unpad(manufacturer_info.model_number)}"
 
-    def get_issuer_key(self) -> Union[bytes, None]:
-        key_info_object = self.get_attribute(6)
+    def get_issuer_key(self) -> Optional[bytes]:
+        key_info_object = self.get_attribute(BCertObjType.KEY)
         if not key_info_object:
             return
 
@@ -381,11 +475,8 @@ class Certificate(_BCertStructs):
     def dumps(self) -> bytes:
         return self._BCERT.build(self.parsed)
 
-    def struct(self) -> _BCertStructs.BCert:
-        return self._BCERT
-
     def verify(self, public_key: bytes, index: int):
-        signature_object = self.get_attribute(8)
+        signature_object = self.get_attribute(BCertObjType.SIGNATURE)
         if not signature_object:
             raise InvalidCertificate(f"No signature object found in certificate {index}")
 
@@ -448,9 +539,6 @@ class CertificateChain(_BCertStructs):
 
     def dumps(self) -> bytes:
         return self._BCERT_CHAIN.build(self.parsed)
-
-    def struct(self) -> _BCertStructs.BCertChain:
-        return self._BCERT_CHAIN
 
     def get_security_level(self) -> int:
         # not sure if there's a better way than this

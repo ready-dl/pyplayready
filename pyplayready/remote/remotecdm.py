@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-import re
+import logging
+from typing import Union
 
 import requests
 
+from pyplayready import InvalidLicense
 from pyplayready.cdm import Cdm
 from pyplayready.device import Device
 from pyplayready.license.key import Key
 
 from pyplayready.exceptions import (DeviceMismatch, InvalidInitData)
+from pyplayready.system.wrmheader import WRMHeader
 
 
 class RemoteCdm(Cdm):
@@ -49,99 +52,101 @@ class RemoteCdm(Cdm):
         # spoof certificate_chain and ecc_key just so we can construct via super call
         super().__init__(security_level, None, None, None)
 
+        self._logger = logging.getLogger()
+
         self.__session = requests.Session()
         self.__session.headers.update({
             "X-Secret-Key": secret
         })
 
-        r = requests.head(self.host)
-        if r.status_code != 200:
-            raise ValueError(f"Could not test Remote API version [{r.status_code}]")
-        server = r.headers.get("Server")
-        if not server or "pyplayready serve" not in server.lower():
-            raise ValueError(f"This Remote CDM API does not seem to be a pyplayready serve API ({server}).")
-        server_version_re = re.search(r"pyplayready serve v([\d.]+)", server, re.IGNORECASE)
-        if not server_version_re:
-            raise ValueError("The pyplayready server API is not stating the version correctly, cannot continue.")
-        server_version = server_version_re.group(1)
-        if server_version < "0.3.1":
-            raise ValueError(f"This pyplayready serve API version ({server_version}) is not supported.")
+        response = requests.head(self.host)
+
+        if response.status_code != 200:
+            self._logger.warning(f"Could not test Remote API version [{response.status_code}]")
+
+        server = response.headers.get("Server")
+        if not server or "playready serve" not in server.lower():
+            self._logger.warning(f"This Remote CDM API does not seem to be a playready serve API ({server}).")
 
     @classmethod
     def from_device(cls, device: Device) -> RemoteCdm:
         raise NotImplementedError("You cannot load a RemoteCdm from a local Device file.")
 
     def open(self) -> bytes:
-        r = self.__session.get(
+        response = self.__session.get(
             url=f"{self.host}/{self.device_name}/open"
-        ).json()
+        )
+        response_json = response.json()
 
-        if r['status'] != 200:
-            raise ValueError(f"Cannot Open CDM Session, {r['message']} [{r['status']}]")
-        r = r["data"]
+        if response.status_code != 200:
+            raise ValueError(f"Cannot Open CDM Session, {response_json['message']} [{response.status_code}]")
 
-        if int(r["device"]["security_level"]) != self.security_level:
+        if int(response_json["data"]["device"]["security_level"]) != self.security_level:
             raise DeviceMismatch("The Security Level specified does not match the one specified in the API response.")
 
-        return bytes.fromhex(r["session_id"])
+        return bytes.fromhex(response_json["data"]["session_id"])
 
     def close(self, session_id: bytes) -> None:
-        r = self.__session.get(
+        response = self.__session.get(
             url=f"{self.host}/{self.device_name}/close/{session_id.hex()}"
-        ).json()
-        if r["status"] != 200:
-            raise ValueError(f"Cannot Close CDM Session, {r['message']} [{r['status']}]")
+        )
+        response_json = response.json()
 
-    def get_license_challenge(
-        self,
-        session_id: bytes,
-        wrm_header: str,
-    ) -> str:
+        if response.status_code != 200:
+            raise ValueError(f"Cannot Close CDM Session, {response_json['message']} [{response.status_code}]")
+
+    def get_license_challenge(self, session_id: bytes, wrm_header: Union[WRMHeader, str]) -> str:
         if not wrm_header:
             raise InvalidInitData("A wrm_header must be provided.")
+        if isinstance(wrm_header, WRMHeader):
+            wrm_header = wrm_header.dumps()
         if not isinstance(wrm_header, str):
-            raise InvalidInitData(f"Expected wrm_header to be a {str}, not {wrm_header!r}")
+            raise ValueError(f"Expected WRMHeader to be a {str} or {WRMHeader} not {wrm_header!r}")
 
-        r = self.__session.post(
+        response = self.__session.post(
             url=f"{self.host}/{self.device_name}/get_license_challenge",
             json={
                 "session_id": session_id.hex(),
-                "init_data": wrm_header,
+                "init_data": wrm_header
             }
-        ).json()
-        if r["status"] != 200:
-            raise ValueError(f"Cannot get Challenge, {r['message']} [{r['status']}]")
-        r = r["data"]
+        )
+        response_json = response.json()
 
-        return r["challenge"]
+        if response.status_code != 200:
+            raise ValueError(f"Cannot get Challenge, {response_json['message']} [{response.status_code}]")
+
+        return response_json["data"]["challenge"]
 
     def parse_license(self, session_id: bytes, license_message: str) -> None:
         if not license_message:
-            raise Exception("Cannot parse an empty license_message")
+            raise InvalidLicense("Cannot parse an empty license_message")
 
         if not isinstance(license_message, str):
-            raise Exception(f"Expected license_message to be a {str}, not {license_message!r}")
+            raise InvalidLicense(f"Expected license_message to be a {str}, not {license_message!r}")
 
-        r = self.__session.post(
+        response = self.__session.post(
             url=f"{self.host}/{self.device_name}/parse_license",
             json={
                 "session_id": session_id.hex(),
                 "license_message": license_message
             }
-        ).json()
-        if r["status"] != 200:
-            raise ValueError(f"Cannot parse License, {r['message']} [{r['status']}]")
+        )
+        response_json = response.json()
+
+        if response.status_code != 200:
+            raise ValueError(f"Cannot parse License, {response_json['message']} [{response.status_code}]")
 
     def get_keys(self, session_id: bytes) -> list[Key]:
-        r = self.__session.post(
+        response = self.__session.post(
             url=f"{self.host}/{self.device_name}/get_keys",
             json={
                 "session_id": session_id.hex()
             }
-        ).json()
-        if r["status"] != 200:
-            raise ValueError(f"Could not get Keys, {r['message']} [{r['status']}]")
-        r = r["data"]
+        )
+        response_json = response.json()
+
+        if response.status_code != 200:
+            raise ValueError(f"Could not get Keys, {response_json['message']} [{response.status_code}]")
 
         return [
             Key(
@@ -151,7 +156,7 @@ class RemoteCdm(Cdm):
                 cipher_type=key["cipher_type"],
                 key_length=key["key_length"]
             )
-            for key in r["keys"]
+            for key in response_json["data"]["keys"]
         ]
 
 

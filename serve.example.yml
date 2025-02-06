@@ -11,5 +11,5 @@ users:
   fx206W0FaB2O34HzGsgb8rcDe9e3ijsf:  # secret key, a-zA-Z-09{32} is recommended, case-sensitive
     username: chloe  # only for internal logging, user will not see this name
     devices:  # list of allowed devices by filename
-      - test_key_001
+      - test_device_001
   # ...

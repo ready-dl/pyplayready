@@ -16,7 +16,7 @@ class DeviceStructs:
         "group_certificate_length" / Int32ub,
         "group_certificate" / Bytes(this.group_certificate_length),
         "encryption_key" / Bytes(96),
-        "signing_key" / Bytes(96),
+        "signing_key" / Bytes(96)
     )
 
     v3 = Struct(
@@ -24,7 +24,7 @@ class DeviceStructs:
         "encryption_key" / Bytes(96),
         "signing_key" / Bytes(96),
         "group_certificate_length" / Int32ub,
-        "group_certificate" / Bytes(this.group_certificate_length),
+        "group_certificate" / Bytes(this.group_certificate_length)
     )
 
     prd = Struct(

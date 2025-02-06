@@ -1,3 +1,6 @@
+import random
+from typing import Optional
+
 from Crypto.Random import get_random_bytes
 
 from pyplayready.license.key import Key
@@ -10,8 +13,8 @@ class Session:
         self.number = number
         self.id = get_random_bytes(16)
         self.xml_key = XmlKey()
-        self.signing_key: ECCKey = None
-        self.encryption_key: ECCKey = None
+        self.signing_key: Optional[ECCKey] = None
+        self.encryption_key: Optional[ECCKey] = None
         self.keys: list[Key] = []
 
 

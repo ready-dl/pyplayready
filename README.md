@@ -1,5 +1,5 @@
 # pyplayready
-All of this is already public. 100% of this code has been derived from the mspr_toolkit.
+All of this is already public. Almost 100% of this code has been derived from the mspr_toolkit.
 
 ## Installation
 ```shell
@@ -55,8 +55,7 @@ pssh = PSSH(
     "AFQATwBNAEEAVABUAFIASQBCAFUAVABFAFMAPgA8AC8ARABBAFQAQQA+ADwALwBXAFIATQBIAEUAQQBEAEUAUgA+AA=="
 )
 
-wrm_headers = pssh.get_wrm_headers()
-request = cdm.get_license_challenge(session_id, wrm_headers[0])
+request = cdm.get_license_challenge(session_id, pssh.wrm_headers[0])
 
 response = requests.post(
     url="https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,sl:2000)",

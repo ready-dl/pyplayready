@@ -1,5 +1,4 @@
 import base64
-import binascii
 from enum import Enum
 from typing import Optional, List, Union, Tuple
 
@@ -34,7 +33,7 @@ class WRMHeader:
         def _missing_(cls, value):
             return cls.UNKNOWN
 
-    _RETURN_STRUCTURE = Tuple[List[SignedKeyID], Union[str, None], Union[str, None], Union[str, None]]
+    _RETURN_STRUCTURE = Tuple[List[SignedKeyID], Optional[str], Optional[str], Optional[str]]
 
     def __init__(self, data: Union[str, bytes]):
         """Load a WRM Header from either a string, base64 encoded data or bytes"""
@@ -45,8 +44,8 @@ class WRMHeader:
         if isinstance(data, str):
             try:
                 data = base64.b64decode(data).decode()
-            except (binascii.Error, binascii.Incomplete):
-                data = data.encode()
+            except Exception:
+                data = data.encode("utf-16-le")
 
         self._raw_data: bytes = data
         self._parsed = xmltodict.parse(self._raw_data)
@@ -92,12 +91,7 @@ class WRMHeader:
                     checksum=kid.get("@CHECKSUM")
                 )]
 
-        return (
-            key_ids,
-            data.get("LA_URL"),
-            data.get("LUI_URL"),
-            data.get("DS_ID")
-        )
+        return key_ids, data.get("LA_URL"), data.get("LUI_URL"), data.get("DS_ID")
 
     @staticmethod
     def _read_v4_2_0_0(data: dict) -> _RETURN_STRUCTURE:
@@ -114,12 +108,7 @@ class WRMHeader:
                         checksum=kid.get("@CHECKSUM")
                     ))
 
-        return (
-            key_ids,
-            data.get("LA_URL"),
-            data.get("LUI_URL"),
-            data.get("DS_ID")
-        )
+        return key_ids, data.get("LA_URL"), data.get("LUI_URL"), data.get("DS_ID")
 
     @staticmethod
     def _read_v4_3_0_0(data: dict) -> _RETURN_STRUCTURE:
@@ -135,19 +124,10 @@ class WRMHeader:
                     checksum=kid.get("@CHECKSUM")
                 ))
 
-        return (
-            key_ids,
-            data.get("LA_URL"),
-            data.get("LUI_URL"),
-            data.get("DS_ID")
-        )
+        return key_ids, data.get("LA_URL"), data.get("LUI_URL"), data.get("DS_ID")
 
     def read_attributes(self) -> _RETURN_STRUCTURE:
-        """
-        Read any non-custom XML attributes
-
-        Returns a tuple structured like this: Tuple[List[SignedKeyID], <LA_URL>, <LUI_URL>, <DS_ID>]
-        """
+        """Read any non-custom XML attributes"""
         data = self._header.get("DATA")
         if not data:
             raise ValueError("Not a valid PlayReady Header Record, WRMHEADER/DATA required")
