@@ -47,6 +47,12 @@ class Key:
         self.key_length = key_length
         self.key = key
 
+    def __repr__(self) -> str:
+        return "{name}({items})".format(
+            name=self.__class__.__name__,
+            items=", ".join([f"{k}={repr(v)}" for k, v in self.__dict__.items()])
+        )
+
     @staticmethod
     def kid_to_uuid(kid: Union[str, bytes]) -> UUID:
         """
